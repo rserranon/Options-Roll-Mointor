@@ -27,6 +27,7 @@ def main():
     ap.add_argument("--once", action="store_true")
     ap.add_argument("--skip-market-check", action="store_true", help="Skip market hours check")
     ap.add_argument("--verbose", "-v", action="store_true", help="Verbose output for debugging")
+    ap.add_argument("--realtime", action="store_true", help="Use real-time market data (requires subscription)")
     args = ap.parse_args()
     
     config = {
@@ -36,12 +37,15 @@ def main():
         'verbose': args.verbose
     }
     
+    data_type = "Real-time" if args.realtime else "Delayed-frozen (free)"
+    
     print(f"🔍 Roll Options Monitor")
     print(f"Connecting to {args.host}:{args.port}")
     print(f"\n📊 Configuration:")
     print(f"   Target Delta: {config['target_delta']:.2f}")
     print(f"   Alert when DTE ≤ {config['dte_threshold_for_alert']}")
     print(f"   Roll window: 30-45 DTE (typically +1 week)")
+    print(f"   Market data: {data_type}")
     print(f"   Check interval: {config['check_interval_seconds']}s\n")
     
     iteration = 0
@@ -70,7 +74,7 @@ def main():
                 continue
         
         try:
-            ib = connect_ib(args.host, args.port, args.clientId)
+            ib = connect_ib(args.host, args.port, args.clientId, realtime=args.realtime)
             
             timestamp = datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')
             print(f"[{timestamp}] Check #{iteration}")

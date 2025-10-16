@@ -143,6 +143,7 @@ python3 roll_monitor.py [OPTIONS]
 - `--once` - Run a single check and exit
 - `--skip-market-check` - Skip market hours validation (useful for paper trading)
 - `--verbose` or `-v` - Verbose output for debugging data retrieval
+- `--realtime` - Use real-time market data (requires IBKR subscription, default: delayed-frozen/free)
 
 ### Examples
 
@@ -159,6 +160,11 @@ python3 roll_monitor.py --once --skip-market-check
 **Verbose mode for debugging data issues:**
 ```bash
 python3 roll_monitor.py --once --verbose
+```
+
+**Use real-time market data (requires subscription):**
+```bash
+python3 roll_monitor.py --once --realtime
 ```
 
 **Use paper trading account:**
@@ -334,6 +340,30 @@ The tool implements a systematic approach to finding roll opportunities:
    - Fetches current position delta
    - Calculates net delta impact for each roll option
    - Helps assess directional exposure changes
+
+## Market Data Types
+
+The tool supports both free delayed data and real-time data (requires subscription).
+
+### Default (Delayed-Frozen) - FREE
+```bash
+python3 roll_monitor.py --once
+```
+- Market Data Type: 4 (Delayed-Frozen)
+- Cost: FREE
+- Latency: 15-20 minute delay
+- Best for: Planning, research, paper trading
+
+### Real-Time (Optional)
+```bash
+python3 roll_monitor.py --once --realtime
+```
+- Market Data Type: 1 (Live)
+- Cost: Requires IBKR market data subscription (~$10-20/month)
+- Latency: Real-time (instant)
+- Best for: Active trading, precise execution
+
+**Note**: Most users can use the default delayed data and save the subscription fee. Real-time data is only necessary for active trading during market hours.
 
 ## Testing
 

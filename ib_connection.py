@@ -4,7 +4,7 @@ IBKR connection management.
 from ib_insync import IB
 
 
-def connect_ib(host="127.0.0.1", port=7496, client_id=2, readonly=True):
+def connect_ib(host="127.0.0.1", port=7496, client_id=2, readonly=True, realtime=False):
     """
     Connect to IBKR TWS/Gateway.
     
@@ -13,13 +13,22 @@ def connect_ib(host="127.0.0.1", port=7496, client_id=2, readonly=True):
         port: IBKR port number
         client_id: Client ID for connection
         readonly: Whether to connect in readonly mode
+        realtime: Use real-time data (True) or delayed-frozen (False)
     
     Returns:
         Connected IB instance
     """
     ib = IB()
     ib.connect(host, port, clientId=client_id, readonly=readonly)
-    ib.reqMarketDataType(4)  # Delayed frozen data
+    
+    # Market data type:
+    # 1 = Live (real-time, requires market data subscription)
+    # 2 = Frozen (last available real-time snapshot)
+    # 3 = Delayed (15-20 minute delayed)
+    # 4 = Delayed-Frozen (free for most users)
+    market_data_type = 1 if realtime else 4
+    ib.reqMarketDataType(market_data_type)
+    
     return ib
 
 

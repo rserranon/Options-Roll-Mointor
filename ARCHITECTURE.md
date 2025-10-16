@@ -49,20 +49,32 @@ The project follows a **layered architecture** pattern:
 **Dependencies**: All other modules
 
 **Flow**:
-1. Parse command-line arguments
+1. Parse command-line arguments (including --realtime flag)
 2. Configure monitoring parameters
-3. Enter monitoring loop (or single execution)
-4. Connect to IBKR
-5. Fetch positions
-6. Analyze roll opportunities
-7. Display results
-8. Disconnect and wait (if continuous mode)
+3. Check market hours (unless --skip-market-check)
+4. Enter monitoring loop (or single execution with --once)
+5. Connect to IBKR with appropriate data type
+6. Fetch positions
+7. Analyze roll opportunities
+8. Display results
+9. Disconnect and wait (if continuous mode)
+
+**Command-Line Arguments**:
+- `--host`, `--port`, `--clientId` - Connection settings
+- `--target-delta` - Delta target for new positions (default: 0.10)
+- `--dte-threshold` - Alert threshold in days (default: 14)
+- `--interval` - Check interval for continuous mode (default: 300s)
+- `--once` - Run single check and exit
+- `--skip-market-check` - Skip market hours validation
+- `--verbose` - Verbose output for debugging
+- `--realtime` - Use real-time market data (requires subscription)
 
 **Design Notes**:
 - Thin orchestration layer (~100 lines)
 - No business logic
 - Focuses on flow control and error handling
 - All configuration from command-line arguments
+- Displays data type in configuration output
 
 ---
 
@@ -71,7 +83,7 @@ The project follows a **layered architecture** pattern:
 **Responsibility**: Manage IBKR TWS/Gateway connections
 
 **Key Functions**:
-- `connect_ib(host, port, client_id, readonly)` - Establish connection
+- `connect_ib(host, port, client_id, readonly, realtime)` - Establish connection
 - `disconnect_ib(ib)` - Safely close connection
 
 **Dependencies**: `ib_insync`
@@ -79,7 +91,7 @@ The project follows a **layered architecture** pattern:
 **Design Notes**:
 - Encapsulates connection complexity
 - Handles connection errors gracefully
-- Sets market data type (delayed-frozen)
+- Configurable market data type (delayed-frozen or real-time)
 - Read-only mode by default for safety
 
 **Connection Parameters**:
@@ -88,6 +100,18 @@ host: str = "127.0.0.1"        # IBKR host
 port: int = 7496               # TWS/Gateway port
 client_id: int = 2             # Client identifier
 readonly: bool = True          # Prevent accidental trades
+realtime: bool = False         # Use real-time data (requires subscription)
+```
+
+**Market Data Types**:
+```python
+# Type 1 = Live (real-time, requires market data subscription)
+# Type 2 = Frozen (last available real-time snapshot)
+# Type 3 = Delayed (15-20 minute delayed)
+# Type 4 = Delayed-Frozen (default, free for most users)
+
+market_data_type = 1 if realtime else 4
+ib.reqMarketDataType(market_data_type)
 ```
 
 ---
@@ -399,13 +423,14 @@ def get_market_status() -> dict:
 ### Complete Workflow
 
 ```
-1. User invokes roll_monitor.py with arguments
+1. User invokes roll_monitor.py with arguments (including optional --realtime)
                     ↓
 2. Main loop begins
                     ↓
 2a. Check market hours (if not --skip-market-check)
                     ↓ (skip if closed)
-3. Connect to IBKR via ib_connection.connect_ib()
+3. Connect to IBKR via ib_connection.connect_ib(realtime=args.realtime)
+   - Sets market data type: 1 (live) if realtime, else 4 (delayed-frozen)
                     ↓
 4. Fetch positions via portfolio.get_current_positions()
    - Retry logic: 3-4 attempts with progressive waits
@@ -521,15 +546,31 @@ roll_monitor.py
 - Sufficient to find target delta strikes
 - Prevents timeout on wide chains
 
-### 5. Delayed-Frozen Data Type
+### 5. Market Data Type Configuration
 
-**Decision**: Use market data type 4 (delayed-frozen)
+**Decision**: Support both delayed-frozen (free, default) and real-time (subscription) data
 
 **Rationale**:
-- Available for paper trading accounts
-- Free for most users
-- Acceptable delay for roll analysis
-- Can be changed if real-time is needed
+- **Delayed-Frozen (Type 4) as default**: Free for most users, acceptable for roll planning
+- **Real-time (Type 1) as option**: Available when precision matters for active trading
+- **Flexibility**: One tool serves all use cases without code changes
+- **Cost awareness**: Most users save $10-20/month by using free delayed data
+- **Transparency**: Clear display of data type in configuration output
+
+**Implementation**:
+```python
+# Default behavior (free)
+python3 roll_monitor.py --once
+# Uses market data type 4 (delayed-frozen)
+
+# Real-time option (requires subscription)
+python3 roll_monitor.py --once --realtime
+# Uses market data type 1 (live)
+```
+
+**When to use each**:
+- Delayed-Frozen: Roll planning, research, paper trading, after-hours analysis
+- Real-time: Active trading during market hours, precise execution timing
 
 ### 6. Net Delta Calculation
 
