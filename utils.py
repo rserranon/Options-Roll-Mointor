@@ -56,16 +56,16 @@ def get_market_status():
         reason = "Weekend"
     elif now.hour < 9 or (now.hour == 9 and now.minute < 30):
         market_open = now.replace(hour=9, minute=30, second=0, microsecond=0)
-        reason = f"Pre-market (opens at {market_open.strftime('%I:%M %p ET')})"
+        reason = f"Pre-market (opens at {market_open.strftime('%I:%M %p CT')})"
     elif now.hour >= 16:
         next_day = now.replace(hour=9, minute=30, second=0, microsecond=0)
-        reason = f"After-hours (opens tomorrow at {next_day.strftime('%I:%M %p ET')})"
+        reason = f"After-hours (opens tomorrow at {next_day.strftime('%I:%M %p CT')})"
     else:
         reason = "Market open"
     
     return {
         'is_open': is_open,
-        'current_time': now.strftime('%Y-%m-%d %I:%M:%S %p ET'),
+        'current_time': now.strftime('%Y-%m-%d %I:%M:%S %p CT'),
         'day_of_week': now.strftime('%A'),
         'reason': reason
     }

@@ -11,7 +11,7 @@ import time
 from ib_connection import connect_ib, disconnect_ib
 from portfolio import get_current_positions
 from options_finder import find_roll_options
-from display import print_roll_options, print_positions_summary
+from display import print_legend, print_roll_options, print_positions_summary
 from utils import dte, is_market_open, get_market_status
 
 
@@ -24,7 +24,7 @@ def main():
     ap.add_argument("--target-delta", type=float, default=0.10)
     ap.add_argument("--dte-threshold", type=int, default=14, help="Alert when DTE <= this")
     ap.add_argument("--interval", type=int, default=300, help="Check interval in seconds")
-    ap.add_argument("--once", action="store_true")
+    ap.add_argument("--once", action="store_true", help="Run only once")
     ap.add_argument("--skip-market-check", action="store_true", help="Skip market hours check")
     ap.add_argument("--verbose", "-v", action="store_true", help="Verbose output for debugging")
     ap.add_argument("--realtime", action="store_true", help="Use real-time market data (requires subscription)")
@@ -60,7 +60,7 @@ def main():
                 timestamp = datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')
                 print(f"[{timestamp}] Check #{iteration}")
                 print("-" * 75)
-                print(f"⏸️  Market is closed: {status['reason']}")
+                print(f"   Market is closed: {status['reason']}")
                 print(f"   Current time: {status['current_time']}")
                 print(f"   Day: {status['day_of_week']}")
                 
@@ -138,7 +138,9 @@ def main():
                     except Exception as e:
                         errors += 1
                         print(f"  ⚠️  Error checking {pos.get('symbol', 'unknown')}: {str(e)}")
-                
+
+                print_legend(use_colors=True) 
+
                 # Summary
                 if options_found == 0 and skipped_expiring == 0 and errors == 0:
                     print(f"\n  ✓ No roll options at this time")

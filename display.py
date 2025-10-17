@@ -54,9 +54,9 @@ def print_roll_options(roll_info, use_colors=True):
     """
     import math
     
-    print("\n" + "="*125)
+    print("\n" + "="*150)
     print("📊 ROLL OPTIONS AVAILABLE")
-    print("="*125)
+    print("="*150)
     
     spot = roll_info.get('spot')
     spot_str = f"${spot:.2f}" if spot and not math.isnan(spot) else "N/A"
@@ -81,8 +81,8 @@ def print_roll_options(roll_info, use_colors=True):
     print(f"  Current P&L: {pnl_str}")
     
     print(f"\nROLL OPTIONS:")
-    print(f"{'Type':<20} {'Strike':>8} {'Expiry':<12} {'DTE':>4} {'NewΔ':>7} {'NetΔ':>7} {'Premium':>8} {'Net':>8} {'Eff%':>6} {'ROI%':>6} {'Ann%':>6} {'$/DTE':>8}")
-    print("-" * 140)
+    print(f"{'Type':<20} {'Strike':>8} {'Expiry':<12} {'DTE':>4} {'NewΔ':>7} {'NetΔ':>7} {'Premium':>8} {'Net':>8} {'Total $':>10} {'Eff%':>6} {'ROI%':>6} {'Ann%':>6} {'$/DTE':>8}")
+    print("-" * 150)
     
     # Sort options by Capital ROI descending (best earnings first)
     sorted_options = sorted(roll_info['options'], 
@@ -128,6 +128,9 @@ def print_roll_options(roll_info, use_colors=True):
         else:
             per_dte_str = "N/A"
         
+        # Format total cash generated
+        total_str = f"${total_income:.0f}" if not math.isnan(total_income) else "N/A"
+        
         # Apply color based on Premium Efficiency
         if use_colors and not math.isnan(premium_eff):
             color = get_roi_color(premium_eff)
@@ -137,10 +140,11 @@ def print_roll_options(roll_info, use_colors=True):
             reset = ""
         
         print(f"{color}{opt['type']:<20} {data['strike']:>8.2f} {data['expiry']:<12} {data['dte']:>4} "
-              f"{new_delta_str:>7} {net_delta_str:>7} ${data['mark']:>7.2f} {net_str:>8} {eff_str:>6} {roi_str:>6} {ann_str:>6} {per_dte_str:>8}{reset}")
+              f"{new_delta_str:>7} {net_delta_str:>7} ${data['mark']:>7.2f} {net_str:>8} {total_str:>10} {eff_str:>6} {roi_str:>6} {ann_str:>6} {per_dte_str:>8}{reset}")
     
-    print("="*140)
-    
+    print("="*150)
+
+def print_legend(use_colors):
     # Print legend
     if use_colors:
         print(f"\n{Colors.BOLD}Color Guide:{Colors.RESET} Based on Premium Efficiency (Eff%)")
@@ -151,13 +155,14 @@ def print_roll_options(roll_info, use_colors=True):
               f"{Colors.NEGATIVE}■{Colors.RESET} Negative (≤0%)")
     
     print(f"\n{Colors.BOLD}Column Guide:{Colors.RESET}")
+    print(f"  Total $  = Total Cash Generated: Net × Contracts × 100")
     print(f"  Eff%  = Premium Efficiency: (Net / New Premium) - Shows roll deal quality")
     print(f"  ROI%  = Return on Capital: (Net / Current Strike) - Shows earnings per period")
     print(f"  Ann%  = Annualized ROI: ROI% × (365 / DTE) - Projected annual return")
     print(f"  Note: Sorted by Capital ROI (highest earnings first)")
     
     print(f"\nTimestamp: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')}")
-    print("="*140 + "\n")
+    print("="*150 + "\n")
 
 
 def print_positions_summary(positions):
