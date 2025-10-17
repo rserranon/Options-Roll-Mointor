@@ -140,7 +140,8 @@ def print_roll_options(roll_info, use_colors=True):
               f"{new_delta_str:>7} {net_delta_str:>7} ${data['mark']:>7.2f} {net_str:>8} {eff_str:>6} {roi_str:>6} {ann_str:>6} {per_dte_str:>8}{reset}")
     
     print("="*140)
-    
+
+def print_legend(use_colors):
     # Print legend
     if use_colors:
         print(f"\n{Colors.BOLD}Color Guide:{Colors.RESET} Based on Premium Efficiency (Eff%)")
