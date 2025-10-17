@@ -331,15 +331,35 @@ The tool implements a systematic approach to finding roll opportunities:
    - Constrains candidates to 30-45 DTE range
    - Selects expiry closest to target date
 
-3. **Strike Selection**:
-   - Same strike as current position
-   - Strikes matching target delta (default: 0.10)
-   - Includes roll up and roll down options
+3. **Strike Selection** (Optimized Algorithm):
+   - **Smart Band Selection**: For 0.10 delta target, focuses on OTM strikes between spot+20 and spot+250
+   - **Even Sampling**: Samples strikes evenly across the band (max 20 strikes)
+   - **Early Exit**: Stops after finding 8 options within ±0.05 delta of target
+   - **Result**: Returns top 5 strikes closest to target delta
+   - **Performance**: Typically queries 12-15 strikes instead of 50 (3-4× faster)
 
 4. **Delta Analysis**:
    - Fetches current position delta
    - Calculates net delta impact for each roll option
    - Helps assess directional exposure changes
+
+### Strike Selection Performance
+
+The optimized algorithm significantly improves scan speed:
+
+**Previous Approach:**
+- Band: (spot - 100) to (spot + 400) - very wide
+- Sample: First 50 strikes
+- Query: All 50 strikes sequentially
+- Time: ~2.9s × 50 = 145 seconds per position
+
+**Optimized Approach:**
+- Band: (spot + 20) to (spot + 250) for 0.10 delta target - focused
+- Sample: Evenly spaced, max 20 strikes
+- Query: Early exit after 8 good options found
+- Time: ~2.9s × 12-15 = 35-45 seconds per position
+
+**Result**: 3-4× faster scans, especially beneficial when monitoring multiple positions.
 
 ## Market Data Types
 

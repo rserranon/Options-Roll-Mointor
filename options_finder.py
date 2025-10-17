@@ -47,6 +47,7 @@ def get_next_weekly_expiry(ib, symbol, current_expiry_date):
 def find_strikes_by_delta(ib, symbol, expiry, target_delta, spot, current_strike):
     """
     Find strikes near target delta for the given expiry.
+    Optimized for 0.10 delta target with smart band selection and early exit.
     
     Args:
         ib: Connected IB instance
@@ -73,17 +74,35 @@ def find_strikes_by_delta(ib, symbol, expiry, target_delta, spot, current_strike
         if not strikes:
             continue
         
-        # Sample strikes around and above spot for OTM calls
+        # Smart band selection optimized for target delta
         if spot:
-            # Wide range to catch 10 delta options
-            band = [k for k in strikes if (spot - 100) <= k <= (spot + 400)]
-            sample = band[:50] if len(band) > 50 else band
+            if target_delta < 0.15:
+                # For low delta (0.10): focus on OTM strikes
+                # 0.10 delta typically lives between spot+20 to spot+250
+                band = [k for k in strikes if (spot + 20) <= k <= (spot + 250)]
+            else:
+                # For higher delta: closer to spot
+                band = [k for k in strikes if (spot - 50) <= k <= (spot + 150)]
+            
+            # Sample evenly across band (max 20 strikes)
+            if len(band) > 20:
+                step = len(band) // 20
+                sample = band[::step][:20]
+            else:
+                sample = band
         else:
-            sample = strikes[:50]
+            # Fallback if no spot price (should be rare during market hours)
+            sample = strikes[:20]
         
-        # Get quotes and deltas
+        # Get quotes with early exit
         options = []
+        delta_tolerance = 0.05  # Accept deltas within ±0.05 of target
+        
         for k in sample:
+            # Early exit: stop after finding 8 options in acceptable delta range
+            if len([o for o in options if abs(abs(o['delta']) - target_delta) <= delta_tolerance]) >= 8:
+                break
+            
             opt_data = get_option_quote(ib, symbol, expiry, k)
             if opt_data and opt_data['delta'] is not None:
                 options.append(opt_data)
@@ -91,15 +110,11 @@ def find_strikes_by_delta(ib, symbol, expiry, target_delta, spot, current_strike
         if not options:
             continue
         
-        # Sort by delta closeness
+        # Sort by delta closeness to target
         options.sort(key=lambda o: abs(abs(o['delta']) - target_delta))
         
-        # Return multiple options: closest to target delta, and neighbor strikes
-        results = []
-        for opt in options[:5]:  # Top 5 closest to target delta
-            results.append(opt)
-        
-        return results
+        # Return top 5 closest to target delta for comparison
+        return options[:5]
     
     return []
 
