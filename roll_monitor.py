@@ -17,11 +17,12 @@ from utils import dte, is_market_open, get_market_status
 
 def main():
     """Main entry point for the roll monitor."""
-    ap = argparse.ArgumentParser(description="Monitor covered calls and show roll options.")
+    ap = argparse.ArgumentParser(description="Monitor covered calls and cash-secured puts, showing roll options.")
     ap.add_argument("--host", default="127.0.0.1")
     ap.add_argument("--port", type=int, default=7496)
     ap.add_argument("--clientId", type=int, default=2)
-    ap.add_argument("--target-delta", type=float, default=0.10)
+    ap.add_argument("--target-delta-call", type=float, default=0.10, help="Target delta for covered calls")
+    ap.add_argument("--target-delta-put", type=float, default=-0.90, help="Target delta for cash-secured puts")
     ap.add_argument("--dte-threshold", type=int, default=14, help="Alert when DTE <= this")
     ap.add_argument("--interval", type=int, default=300, help="Check interval in seconds")
     ap.add_argument("--once", action="store_true")
@@ -31,7 +32,8 @@ def main():
     args = ap.parse_args()
     
     config = {
-        'target_delta': args.target_delta,
+        'target_delta_call': args.target_delta_call,
+        'target_delta_put': args.target_delta_put,
         'dte_threshold_for_alert': args.dte_threshold,
         'check_interval_seconds': args.interval,
         'verbose': args.verbose
@@ -42,7 +44,8 @@ def main():
     print(f"🔍 Roll Options Monitor")
     print(f"Connecting to {args.host}:{args.port}")
     print(f"\n📊 Configuration:")
-    print(f"   Target Delta: {config['target_delta']:.2f}")
+    print(f"   Target Delta (Calls): {config['target_delta_call']:.2f}")
+    print(f"   Target Delta (Puts): {config['target_delta_put']:.2f}")
     print(f"   Alert when DTE ≤ {config['dte_threshold_for_alert']}")
     print(f"   Roll window: 30-45 DTE (typically +1 week)")
     print(f"   Market data: {data_type}")

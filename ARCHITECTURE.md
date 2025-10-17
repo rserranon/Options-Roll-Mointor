@@ -61,7 +61,8 @@ The project follows a **layered architecture** pattern:
 
 **Command-Line Arguments**:
 - `--host`, `--port`, `--clientId` - Connection settings
-- `--target-delta` - Delta target for new positions (default: 0.10)
+- `--target-delta-call` - Delta target for covered calls (default: 0.10)
+- `--target-delta-put` - Delta target for cash-secured puts (default: -0.90)
 - `--dte-threshold` - Alert threshold in days (default: 14)
 - `--interval` - Check interval for continuous mode (default: 300s)
 - `--once` - Run single check and exit
@@ -121,9 +122,8 @@ ib.reqMarketDataType(market_data_type)
 **Responsibility**: Retrieve and process market data from IBKR
 
 **Key Functions**:
-- `safe_mark(ticker, verbose)` - Calculate reliable mark price with fallback logic
-- `wait_for_greeks(ticker, timeout)` - Wait for option Greeks to populate
-- `get_option_quote(ib, symbol, expiry, strike, timeout)` - Get option quote with Greeks
+- `get_option_quote(ib, symbol, expiry, strike, right, timeout)` - Get option quote with Greeks
+  - New parameter `right`: 'C' for call or 'P' for put
 - `get_stock_price(ib, symbol)` - Get underlying stock price with multi-exchange retry
 
 **Dependencies**: `ib_insync`, `utils`
@@ -164,12 +164,13 @@ ib.reqMarketDataType(market_data_type)
 **Responsibility**: Fetch and process account positions with enhanced data retrieval
 
 **Key Functions**:
-- `get_current_positions(ib, retry_attempts, initial_wait)` - Get all short call positions with Greeks
+- `get_current_positions(ib, retry_attempts, initial_wait)` - Get all short call and put positions with Greeks
 
 **Dependencies**: `ib_insync`, `market_data`
 
 **Design Notes**:
-- Filters for short call positions only (position < 0, right = 'C')
+- Filters for short option positions (position < 0, right in ('C', 'P'))
+- Handles both covered calls and cash-secured puts
 - **Enhanced retry logic**: 3-4 attempts with progressive waits
 - Progressive wait times: 1.0s, 1.5s, 2.0s (+ 2.5s in verbose mode)
 - Requests Greeks (tick type 106) for current positions
@@ -184,6 +185,7 @@ ib.reqMarketDataType(market_data_type)
     'symbol': str,            # Underlying symbol
     'strike': float,          # Strike price
     'expiry': str,           # YYYYMMDD format
+    'right': str,            # 'C' for call, 'P' for put
     'contracts': int,         # Number of contracts (absolute value)
     'entry_credit': float,    # Original credit per share
     'current_mark': float,    # Current option price
@@ -199,9 +201,14 @@ ib.reqMarketDataType(market_data_type)
 **Responsibility**: Find and analyze roll opportunities
 
 **Key Functions**:
-- `get_next_weekly_expiry(ib, symbol, current_expiry_date)` - Find target roll expiry
-- `find_strikes_by_delta(ib, symbol, expiry, target_delta, spot, current_strike)` - Find strikes by delta
+- `get_next_weekly_expiry(ib, symbol, current_expiry_date, right)` - Find target roll expiry
+  - New parameter `right`: 'C' for call or 'P' for put
+- `find_strikes_by_delta(ib, symbol, expiry, target_delta, spot, current_strike, right)` - Find strikes by delta
+  - New parameter `right`: 'C' for call or 'P' for put
+  - Smart band selection adapts based on option type
 - `find_roll_options(ib, position, config)` - Main analysis function
+  - Selects appropriate target delta based on position['right']
+  - Handles both calls and puts
 
 **Dependencies**: `ib_insync`, `market_data`, `utils`
 
@@ -225,11 +232,18 @@ ib.reqMarketDataType(market_data_type)
 
 **Strike Sampling Strategy** (Optimized):
 ```python
-1. Smart Band Selection (based on target delta):
+1. Smart Band Selection (based on target delta and option type):
+   # For Calls:
    - For target_delta < 0.15 (e.g., 0.10):
      band = [spot + 20, spot + 250]  # OTM calls
    - For target_delta ≥ 0.15:
      band = [spot - 50, spot + 150]  # Closer to ATM
+   
+   # For Puts:
+   - For target_delta < -0.85 (e.g., -0.90):
+     band = [spot - 250, spot - 20]  # OTM puts (below spot)
+   - For target_delta ≥ -0.85:
+     band = [spot - 150, spot + 50]  # Closer to ATM
    
 2. Even Sampling (max 20 strikes):
    - If band > 20 strikes: sample evenly with step = len(band) / 20
@@ -241,7 +255,7 @@ ib.reqMarketDataType(market_data_type)
    - Avoids unnecessary API calls
    
 4. Get quotes and Greeks for sampled strikes only
-5. Sort by delta closeness to target
+5. Sort by delta closeness to target (uses absolute values for comparison)
 6. Return top 5 candidates
 ```
 
