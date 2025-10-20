@@ -11,7 +11,7 @@ import time
 from ib_connection import connect_ib, disconnect_ib
 from portfolio import get_current_positions
 from options_finder import find_roll_options
-from display import print_legend, print_roll_options, print_positions_summary
+from display import print_legend, print_roll_options, print_positions_summary, Colors
 from utils import dte, is_market_open, get_market_status
 
 
@@ -117,16 +117,16 @@ def main():
                                 elif error_type == 'missing_data':
                                     # Concerning - missing data for non-expiring position
                                     errors += 1
-                                    print(f"  ⚠️  {roll_info['symbol']} ${roll_info['strike']:.2f} ({roll_info['dte']} DTE) - "
-                                          f"ERROR: {roll_info['reason']}")
+                                    print(f"  {Colors.MODERATE}⚠️  {roll_info['symbol']} ${roll_info['strike']:.2f} ({roll_info['dte']} DTE) - "
+                                          f"ERROR: {roll_info['reason']}{Colors.RESET}")
                                 elif error_type == 'no_expiry':
                                     errors += 1
-                                    print(f"  ⚠️  {roll_info['symbol']} ${roll_info['strike']:.2f} ({roll_info['dte']} DTE) - "
-                                          f"ERROR: {roll_info['reason']}")
+                                    print(f"  {Colors.MODERATE}⚠️  {roll_info['symbol']} ${roll_info['strike']:.2f} ({roll_info['dte']} DTE) - "
+                                          f"ERROR: {roll_info['reason']}{Colors.RESET}")
                                 else:
                                     errors += 1
-                                    print(f"  ⚠️  {roll_info['symbol']} ${roll_info['strike']:.2f} - "
-                                          f"ERROR: {roll_info.get('reason', 'Unknown error')}")
+                                    print(f"  {Colors.MODERATE}⚠️  {roll_info['symbol']} ${roll_info['strike']:.2f} - "
+                                          f"ERROR: {roll_info.get('reason', 'Unknown error')}{Colors.RESET}")
                             else:
                                 # Valid roll options found
                                 print_roll_options(roll_info)

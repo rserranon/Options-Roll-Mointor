@@ -62,7 +62,7 @@ def print_roll_options(roll_info, use_colors=True):
     position_type = "Covered Call" if right == 'C' else "Cash-Secured Put"
     
     spot = roll_info.get('spot')
-    spot_str = f"${spot:.2f}" if spot and not math.isnan(spot) else "N/A"
+    spot_str = f"${spot:,.2f}" if spot and not math.isnan(spot) else "N/A"
     print(f"Symbol: {roll_info['symbol']}  |  Type: {position_type}  |  Spot: {spot_str}  |  Contracts: {roll_info['contracts']}")
     
     print(f"\nCURRENT POSITION:")
@@ -70,17 +70,17 @@ def print_roll_options(roll_info, use_colors=True):
     current_delta_str = f"{current_delta:.3f}" if current_delta and not math.isnan(current_delta) else "N/A"
     
     buyback = roll_info['buyback_cost']
-    buyback_str = f"${buyback:.2f}" if buyback and not math.isnan(buyback) else "N/A"
+    buyback_str = f"${buyback:,.2f}" if buyback and not math.isnan(buyback) else "N/A"
     
     pnl = roll_info['current_pnl']
     if pnl and not math.isnan(pnl):
         pnl_pct = (pnl / roll_info['entry_credit'] * 100) if roll_info['entry_credit'] > 0 else 0
-        pnl_str = f"${pnl:.2f} ({pnl_pct:.1f}%)"
+        pnl_str = f"${pnl:,.2f} ({pnl_pct:.1f}%)"
     else:
         pnl_str = "N/A"
     
-    print(f"  Strike: ${roll_info['current_strike']:.2f}  |  Expiry: {roll_info['current_expiry']}  |  DTE: {roll_info['current_dte']}  |  Delta: {current_delta_str}")
-    print(f"  Entry Credit: ${roll_info['entry_credit']:.2f}  |  Buyback Cost: {buyback_str}")
+    print(f"  Strike: ${roll_info['current_strike']:,.2f}  |  Expiry: {roll_info['current_expiry']}  |  DTE: {roll_info['current_dte']}  |  Delta: {current_delta_str}")
+    print(f"  Entry Credit: ${roll_info['entry_credit']:,.2f}  |  Buyback Cost: {buyback_str}")
     print(f"  Current P&L: {pnl_str}")
     
     print(f"\nROLL OPTIONS:")
@@ -116,9 +116,9 @@ def print_roll_options(roll_info, use_colors=True):
         net_delta_str = f"{net_delta:+.3f}" if net_delta is not None and not math.isnan(net_delta) else "N/A"
         
         if net_credit >= 0:
-            net_str = f"${net_credit:.2f}"
+            net_str = f"${net_credit:,.2f}"
         else:
-            net_str = f"-${abs(net_credit):.2f}"
+            net_str = f"-${abs(net_credit):,.2f}"
         
         eff_str = f"{premium_eff:.1f}%" if not math.isnan(premium_eff) else "N/A"
         roi_str = f"{capital_roi:.2f}%" if not math.isnan(capital_roi) else "N/A"
@@ -132,7 +132,7 @@ def print_roll_options(roll_info, use_colors=True):
             per_dte_str = "N/A"
         
         # Format total cash generated
-        total_str = f"${total_income:.0f}" if not math.isnan(total_income) else "N/A"
+        total_str = f"${total_income:,.0f}" if not math.isnan(total_income) else "N/A"
         
         # Apply color based on Premium Efficiency
         if use_colors and not math.isnan(premium_eff):
@@ -142,8 +142,8 @@ def print_roll_options(roll_info, use_colors=True):
             color = ""
             reset = ""
         
-        print(f"{color}{opt['type']:<20} {data['strike']:>8.2f} {data['expiry']:<12} {data['dte']:>4} "
-              f"{new_delta_str:>7} {net_delta_str:>7} ${data['mark']:>7.2f} {net_str:>8} {total_str:>10} {eff_str:>6} {roi_str:>6} {ann_str:>6} {per_dte_str:>8}{reset}")
+        print(f"{color}{opt['type']:<20} {data['strike']:>8,.2f} {data['expiry']:<12} {data['dte']:>4} "
+              f"{new_delta_str:>7} {net_delta_str:>7} ${data['mark']:>7,.2f} {net_str:>8} {total_str:>10} {eff_str:>6} {roi_str:>6} {ann_str:>6} {per_dte_str:>8}{reset}")
     
     print("="*150)
 
@@ -193,15 +193,15 @@ def print_positions_summary(positions):
             mark_str = "N/A"
             pnl = float('nan')  # Can't calculate P&L without current mark
         else:
-            mark_str = f"{current_mark:.2f}"
+            mark_str = f"{current_mark:,.2f}"
             pnl = pos['entry_credit'] - current_mark
         
         # Handle NaN in P&L display
         if isinstance(pnl, float) and math.isnan(pnl):
             pnl_str = "N/A"
         else:
-            pnl_str = f"{pnl:8.2f}"
+            pnl_str = f"{pnl:8,.2f}"
         
-        print(f"{pos['symbol']:<8} {position_type:^4} {pos['strike']:>8.2f} {pos['expiry']:<10} {current_dte:>4} {pos['contracts']:>4} "
-              f"{pos['entry_credit']:>8.2f} {mark_str:>8} {pnl_str:>8}")
+        print(f"{pos['symbol']:<8} {position_type:^4} {pos['strike']:>8,.2f} {pos['expiry']:<10} {current_dte:>4} {pos['contracts']:>4} "
+              f"{pos['entry_credit']:>8,.2f} {mark_str:>8} {pnl_str:>8}")
     print()
