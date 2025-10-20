@@ -15,6 +15,7 @@ This tool connects to your Interactive Brokers TWS/Gateway to monitor short opti
 ## Features
 
 ### Core Functionality
+
 - **Automated Position Monitoring**: Tracks all short call and put positions in your IBKR account
 - **Dual Strategy Support**: Handles both covered calls and cash-secured puts
 - **Smart Roll Detection**: Identifies roll opportunities approximately 1 week out from current expiry
@@ -31,7 +32,9 @@ This tool connects to your Interactive Brokers TWS/Gateway to monitor short opti
 - **P&L Tracking**: Shows current profit/loss on each position
 
 ### Display Metrics
+
 For each roll option, the tool displays:
+
 - Strike price and expiry date
 - Days to expiration (DTE)
 - New option delta (NewΔ)
@@ -46,6 +49,7 @@ For each roll option, the tool displays:
 ### Three ROI Metrics Explained
 
 **1. Eff% - Premium Efficiency**
+
 - Formula: (Net Credit / New Premium) × 100
 - Shows: What percentage of the new premium you keep
 - Range: Typically 75-100%
@@ -53,6 +57,7 @@ For each roll option, the tool displays:
 - Example: 98.4% means you keep $4.28 of $4.35 premium (only $0.07 to close)
 
 **2. ROI% - Return on Capital**
+
 - Formula: (Net Credit / Current Strike) × 100
 - Shows: Return on your capital commitment per period
 - Range: Typically 0.5-5% per period
@@ -60,6 +65,7 @@ For each roll option, the tool displays:
 - Example: 2.35% means you earn $2.35 per $100 of stock value over the DTE period
 
 **3. Ann% - Annualized ROI**
+
 - Formula: ROI% × (365 / DTE)
 - Shows: Projected annual return if strategy repeated
 - Range: Typically 6-60% annualized
@@ -67,12 +73,15 @@ For each roll option, the tool displays:
 - Example: 28.6% shows the annual return if you repeated this monthly
 
 ### Sorting and Decision Making
+
 - **Default Sort**: By Capital ROI (highest earnings first)
 - **Color Coding**: Based on Premium Efficiency (deal quality)
 - **Use Both**: High Premium Efficiency + High Capital ROI = Best roll
 
 ### Color Coding
+
 Roll options are automatically color-coded based on Premium Efficiency:
+
 - 🟢 **Excellent (≥90%)**: Keeping 90%+ of new premium (bright green)
 - 🟢 **Good (≥75%)**: Keeping 75-89% of new premium (green)
 - 🟡 **Moderate (≥50%)**: Keeping 50-74% of new premium (yellow)
@@ -82,6 +91,7 @@ Roll options are automatically color-coded based on Premium Efficiency:
 ## Installation
 
 ### Prerequisites
+
 - Python 3.7 or higher
 - Interactive Brokers TWS or Gateway
 - Active IBKR account with options permissions
@@ -89,6 +99,7 @@ Roll options are automatically color-coded based on Premium Efficiency:
 ### Setup
 
 1. Clone or download this repository:
+
 ```bash
 cd /path/to/your/workspace
 git clone <repository-url>
@@ -96,12 +107,14 @@ cd IBRK-Options
 ```
 
 2. Create a virtual environment (recommended):
+
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 ```
 
 3. Install required dependencies:
+
 ```bash
 pip install -r requirements.txt
 ```
@@ -115,11 +128,13 @@ pip install -r requirements.txt
 ### Basic Commands
 
 Run a single check:
+
 ```bash
 python3 roll_monitor.py --once
 ```
 
 Run continuous monitoring (checks every 5 minutes):
+
 ```bash
 python3 roll_monitor.py
 ```
@@ -131,6 +146,7 @@ python3 roll_monitor.py [OPTIONS]
 ```
 
 **Connection Options:**
+
 - `--host HOST` - IBKR host address (default: 127.0.0.1)
 - `--port PORT` - IBKR port number (default: 7496)
   - TWS Paper Trading: 7497
@@ -140,6 +156,7 @@ python3 roll_monitor.py [OPTIONS]
 - `--clientId ID` - Client ID for connection (default: 2)
 
 **Strategy Options:**
+
 - `--target-delta-call DELTA` - Target delta for covered calls (default: 0.10)
 - `--target-delta-put DELTA` - Target delta for cash-secured puts (default: -0.90)
 - `--dte-threshold DAYS` - Alert when DTE ≤ this value (default: 14)
@@ -152,36 +169,43 @@ python3 roll_monitor.py [OPTIONS]
 ### Examples
 
 **Monitor with custom DTE threshold:**
+
 ```bash
 python3 roll_monitor.py --dte-threshold 21 --once
 ```
 
 **Skip market hours check (for paper trading or testing):**
+
 ```bash
 python3 roll_monitor.py --once --skip-market-check
 ```
 
 **Verbose mode for debugging data issues:**
+
 ```bash
 python3 roll_monitor.py --once --verbose
 ```
 
 **Use real-time market data (requires subscription):**
+
 ```bash
 python3 roll_monitor.py --once --realtime
 ```
 
 **Use paper trading account:**
+
 ```bash
 python3 roll_monitor.py --port 7497
 ```
 
 **Custom target delta and check interval:**
+
 ```bash
 python3 roll_monitor.py --target-delta-call 0.15 --target-delta-put -0.85 --interval 600
 ```
 
 **Full custom configuration:**
+
 ```bash
 python3 roll_monitor.py \
   --host 127.0.0.1 \
@@ -254,12 +278,14 @@ Timestamp: 2025-10-16 18:30:00 UTC
 ## Understanding the Output
 
 ### Current Position Section
+
 - **Delta**: Your current short call's delta (negative for short positions)
 - **Entry Credit**: Original credit received when opening the position
 - **Buyback Cost**: Current cost to close the position
 - **Current P&L**: Profit/loss including percentage return
 
 ### Roll Options Table
+
 - **Type**: Roll category (Same Strike, Roll Up, Roll Down)
 - **Strike**: New option strike price
 - **Expiry**: New option expiration date
@@ -287,6 +313,7 @@ Timestamp: 2025-10-16 18:30:00 UTC
 ### Understanding the Three ROI Metrics
 
 **Premium Efficiency (Eff%)**
+
 - Measures: Roll transaction quality
 - Range: Typically 75-100%
 - Good values: ≥90% is excellent
@@ -294,6 +321,7 @@ Timestamp: 2025-10-16 18:30:00 UTC
 - Color coded: Green (good) to Red (poor)
 
 **Capital ROI (ROI%)**
+
 - Measures: Earnings on invested capital
 - Range: Typically 0.5-5% per period
 - Good values: ≥2% is strong
@@ -301,6 +329,7 @@ Timestamp: 2025-10-16 18:30:00 UTC
 - Primary sort: Options sorted by this metric
 
 **Annualized ROI (Ann%)**
+
 - Measures: Strategy performance potential
 - Range: Typically 6-60% annualized
 - Good values: ≥20% is strong for covered calls
@@ -310,16 +339,19 @@ Timestamp: 2025-10-16 18:30:00 UTC
 ### Decision Framework
 
 **Scenario 1: High Efficiency + High ROI**
+
 - Example: 99.5% Eff%, 3.83% ROI, 46.6% Ann
 - **Best Choice**: Excellent roll deal AND great earnings
 - Action: Strong candidate for execution
 
 **Scenario 2: High Efficiency + Low ROI**
+
 - Example: 98.4% Eff%, 1.16% ROI, 14.1% Ann
 - Interpretation: Efficient roll but modest earnings
 - Action: Good for safety, less for income
 
 **Scenario 3: Moderate Efficiency + High ROI**
+
 - Example: 85% Eff%, 4.0% ROI, 48% Ann
 - Interpretation: More cost to close but better income
 - Action: Evaluate if extra income worth the cost
@@ -332,7 +364,7 @@ The tool implements a systematic approach to finding roll opportunities:
 
 1. **DTE Monitoring**: Only alerts when positions are within the configured DTE threshold (default: 14 days)
 
-2. **Target Expiry Selection**: 
+2. **Target Expiry Selection**:
    - Calculates target as current_expiry + 7 days (typically 1 week roll)
    - Constrains candidates to 30-45 DTE range
    - Selects expiry closest to target date
@@ -355,12 +387,14 @@ The tool implements a systematic approach to finding roll opportunities:
 The optimized algorithm significantly improves scan speed:
 
 **Previous Approach:**
+
 - Band: (spot - 100) to (spot + 400) - very wide
 - Sample: First 50 strikes
 - Query: All 50 strikes sequentially
 - Time: ~2.9s × 50 = 145 seconds per position
 
 **Optimized Approach:**
+
 - Band: (spot + 20) to (spot + 250) for 0.10 delta target - focused
 - Sample: Evenly spaced, max 20 strikes
 - Query: Early exit after 8 good options found
@@ -373,18 +407,22 @@ The optimized algorithm significantly improves scan speed:
 The tool supports both free delayed data and real-time data (requires subscription).
 
 ### Default (Delayed-Frozen) - FREE
+
 ```bash
 python3 roll_monitor.py --once
 ```
+
 - Market Data Type: 4 (Delayed-Frozen)
 - Cost: FREE
 - Latency: 15-20 minute delay
 - Best for: Planning, research, paper trading
 
 ### Real-Time (Optional)
+
 ```bash
 python3 roll_monitor.py --once --realtime
 ```
+
 - Market Data Type: 1 (Live)
 - Cost: Requires IBKR market data subscription (~$10-20/month)
 - Latency: Real-time (instant)
@@ -401,6 +439,7 @@ python3 test_refactor.py
 ```
 
 Expected output:
+
 ```
 ============================================================
 REFACTORING SMOKE TESTS
@@ -451,12 +490,14 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for detailed technical documentation.
 ### Connection Issues
 
 **Problem**: "Connection refused" or "Cannot connect to TWS/Gateway"
+
 - Verify TWS/Gateway is running
 - Check API settings are enabled
 - Confirm correct port number
 - Ensure firewall allows local connections
 
 **Problem**: "No market data permissions"
+
 - Verify account has options data subscriptions
 - Check that delayed data is enabled for paper trading
 - Use `ib.reqMarketDataType(4)` for delayed-frozen data
@@ -464,11 +505,13 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for detailed technical documentation.
 ### Data Issues
 
 **Problem**: "Greeks not available" or "Delta: N/A"
-- Increase timeout with `--timeout` parameter
+
+- TODO: Increase timeout with `--timeout` parameter
 - Delayed data can be slow (30-60 seconds lag)
 - Some strikes may not have active quotes
 
 **Problem**: "No roll options found"
+
 - Adjust `--dte-threshold` to include your position
 - Verify positions are within 30-45 DTE roll window
 - Check that option chains are available for the symbol
@@ -476,6 +519,7 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for detailed technical documentation.
 ## Contributing
 
 Contributions are welcome! Please ensure:
+
 - Code follows existing style and structure
 - All modules remain focused on single responsibilities
 - Tests pass before submitting changes
@@ -483,7 +527,7 @@ Contributions are welcome! Please ensure:
 
 ## License
 
-[Specify your license here]
+[MIT](LICENCE.txt)
 
 ## Disclaimer
 
@@ -492,6 +536,7 @@ This tool is for informational purposes only. It does not execute trades automat
 ## Support
 
 For issues or questions:
+
 - Check existing documentation
 - Review [ARCHITECTURE.md](ARCHITECTURE.md) for technical details
 - Open an issue on the repository

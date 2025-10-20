@@ -79,6 +79,8 @@ def find_strikes_by_delta(ib, symbol, expiry, target_delta, spot, current_strike
             continue
         
         # Smart band selection optimized for target delta
+        # ±20 and ±250 are empirical strike offsets that define a plausible window around spot where 
+        # the target delta (e.g., 0.10 or –0.90) is most likely to occur.
         if spot:
             if right == 'C':
                 # Call options
@@ -102,6 +104,8 @@ def find_strikes_by_delta(ib, symbol, expiry, target_delta, spot, current_strike
             # Sample evenly across band (max 20 strikes)
             if len(band) > 20:
                 step = len(band) // 20
+                # sample the full list, every step ::step, for a maximum
+                # of 20 elements [:20]
                 sample = band[::step][:20]
             else:
                 sample = band

@@ -109,7 +109,8 @@ def print_roll_options(roll_info, use_colors=True):
             capital_roi = 0
         if ann_roi is None or math.isnan(ann_roi):
             ann_roi = 0
-        
+
+        # Inline calculation for presentation purposes only 
         total_income = net_credit * roll_info['contracts'] * 100
         
         new_delta_str = f"{data['delta']:.3f}" if data['delta'] and not math.isnan(data['delta']) else "N/A"
