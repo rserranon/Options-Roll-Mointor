@@ -6,7 +6,7 @@ from utils import dte, FALLBACK_EXCHANGES
 from market_data import get_option_quote, get_stock_price
 
 
-def get_next_weekly_expiry(ib, symbol, current_expiry_date):
+def get_next_weekly_expiry(ib, symbol, current_expiry_date, right='C'):
     """
     Find expiry approximately 1 week out from current position expiry date,
     constrained to 30-45 DTE (days to expiration from today).
@@ -15,6 +15,7 @@ def get_next_weekly_expiry(ib, symbol, current_expiry_date):
         ib: Connected IB instance
         symbol: Underlying symbol
         current_expiry_date: Current position's expiry date (YYYYMMDD)
+        right: 'C' for call or 'P' for put
     
     Returns:
         Next expiry date (YYYYMMDD) or None
@@ -26,7 +27,7 @@ def get_next_weekly_expiry(ib, symbol, current_expiry_date):
     target_date = current_date + timedelta(days=7)
     
     for ex in FALLBACK_EXCHANGES:
-        probe = Option(symbol, '', 0.0, 'C', exchange=ex, currency='USD', tradingClass=symbol)
+        probe = Option(symbol, '', 0.0, right, exchange=ex, currency='USD', tradingClass=symbol)
         cds = ib.reqContractDetails(probe)
         if cds:
             expiries = sorted({cd.contract.lastTradeDateOrContractMonth for cd in cds})
@@ -44,31 +45,34 @@ def get_next_weekly_expiry(ib, symbol, current_expiry_date):
     return None
 
 
-def find_strikes_by_delta(ib, symbol, expiry, target_delta, spot, current_strike):
+def find_strikes_by_delta(ib, symbol, expiry, target_delta, spot, current_strike, right='C'):
     """
     Find strikes near target delta for the given expiry.
-    Optimized for 0.10 delta target with smart band selection and early exit.
+    Optimized for specific delta targets with smart band selection and early exit.
+    For calls: target typically 0.10 delta
+    For puts: target typically -0.90 delta
     
     Args:
         ib: Connected IB instance
         symbol: Underlying symbol
         expiry: Target expiry (YYYYMMDD)
-        target_delta: Target delta value
+        target_delta: Target delta value (positive for calls, negative for puts)
         spot: Current stock price
         current_strike: Current position's strike
+        right: 'C' for call or 'P' for put
     
     Returns:
         List of option data dictionaries
     """
     for ex in FALLBACK_EXCHANGES:
-        probe = Option(symbol, '', 0.0, 'C', exchange=ex, currency='USD', tradingClass=symbol)
+        probe = Option(symbol, '', 0.0, right, exchange=ex, currency='USD', tradingClass=symbol)
         cds = ib.reqContractDetails(probe)
         if not cds:
             continue
             
         # Get strikes for this expiry
         contracts_exp = [cd.contract for cd in cds
-                        if cd.contract.right == 'C' and cd.contract.lastTradeDateOrContractMonth == expiry]
+                        if cd.contract.right == right and cd.contract.lastTradeDateOrContractMonth == expiry]
         strikes = sorted({c.strike for c in contracts_exp})
         
         if not strikes:
@@ -76,13 +80,24 @@ def find_strikes_by_delta(ib, symbol, expiry, target_delta, spot, current_strike
         
         # Smart band selection optimized for target delta
         if spot:
-            if target_delta < 0.15:
-                # For low delta (0.10): focus on OTM strikes
-                # 0.10 delta typically lives between spot+20 to spot+250
-                band = [k for k in strikes if (spot + 20) <= k <= (spot + 250)]
+            if right == 'C':
+                # Call options
+                if target_delta < 0.15:
+                    # For low delta (0.10): focus on OTM strikes
+                    # 0.10 delta typically lives between spot+20 to spot+250
+                    band = [k for k in strikes if (spot + 20) <= k <= (spot + 250)]
+                else:
+                    # For higher delta: closer to spot
+                    band = [k for k in strikes if (spot - 50) <= k <= (spot + 150)]
             else:
-                # For higher delta: closer to spot
-                band = [k for k in strikes if (spot - 50) <= k <= (spot + 150)]
+                # Put options
+                if target_delta < -0.85:
+                    # For low delta puts (-0.90): focus on deep OTM (far below spot)
+                    # -0.90 delta typically lives between spot-250 to spot-20
+                    band = [k for k in strikes if (spot - 250) <= k <= (spot - 20)]
+                else:
+                    # For higher delta puts: closer to spot
+                    band = [k for k in strikes if (spot - 150) <= k <= (spot + 50)]
             
             # Sample evenly across band (max 20 strikes)
             if len(band) > 20:
@@ -100,18 +115,18 @@ def find_strikes_by_delta(ib, symbol, expiry, target_delta, spot, current_strike
         
         for k in sample:
             # Early exit: stop after finding 8 options in acceptable delta range
-            if len([o for o in options if abs(abs(o['delta']) - target_delta) <= delta_tolerance]) >= 8:
+            if len([o for o in options if abs(abs(o['delta']) - abs(target_delta)) <= delta_tolerance]) >= 8:
                 break
             
-            opt_data = get_option_quote(ib, symbol, expiry, k)
+            opt_data = get_option_quote(ib, symbol, expiry, k, right=right)
             if opt_data and opt_data['delta'] is not None:
                 options.append(opt_data)
         
         if not options:
             continue
         
-        # Sort by delta closeness to target
-        options.sort(key=lambda o: abs(abs(o['delta']) - target_delta))
+        # Sort by delta closeness to target (using absolute values for comparison)
+        options.sort(key=lambda o: abs(abs(o['delta']) - abs(target_delta)))
         
         # Return top 5 closest to target delta for comparison
         return options[:5]
@@ -121,12 +136,12 @@ def find_strikes_by_delta(ib, symbol, expiry, target_delta, spot, current_strike
 
 def find_roll_options(ib, position, config):
     """
-    Find multiple roll options for a position.
+    Find multiple roll options for a position (call or put).
     
     Args:
         ib: Connected IB instance
-        position: Position dictionary
-        config: Configuration dictionary with target_delta and dte_threshold_for_alert
+        position: Position dictionary (must include 'right' key: 'C' or 'P')
+        config: Configuration dictionary with target_delta_call, target_delta_put, and dte_threshold_for_alert
     
     Returns:
         Dictionary with roll options or None if position should be skipped
@@ -140,6 +155,13 @@ def find_roll_options(ib, position, config):
     current_mark = position['current_mark']
     entry_credit = position['entry_credit']
     current_delta = position.get('current_delta')
+    right = position.get('right', 'C')  # Default to call if not specified
+    
+    # Select appropriate target delta based on option type
+    if right == 'P':
+        target_delta = config.get('target_delta_put', -0.90)
+    else:
+        target_delta = config.get('target_delta_call', 0.10)
     
     current_dte = dte(current_expiry)
     
@@ -180,8 +202,8 @@ def find_roll_options(ib, position, config):
     if spot is None or (isinstance(spot, float) and math.isnan(spot)):
         spot = None  # Will impact strike selection quality
     
-    # Find next weekly expiry (pass the expiry date, not DTE)
-    next_expiry = get_next_weekly_expiry(ib, symbol, current_expiry)
+    # Find next weekly expiry (pass the expiry date and option type)
+    next_expiry = get_next_weekly_expiry(ib, symbol, current_expiry, right)
     if not next_expiry:
         return {
             'error': 'no_expiry',
@@ -199,7 +221,7 @@ def find_roll_options(ib, position, config):
         buyback_cost = 0  # Treat as zero if missing (likely expired option)
     
     # Option 1: Same strike roll
-    same_strike = get_option_quote(ib, symbol, next_expiry, current_strike)
+    same_strike = get_option_quote(ib, symbol, next_expiry, current_strike, right=right)
     if same_strike:
         # Calculate net delta change: new_delta - current_delta
         net_delta = None
@@ -229,15 +251,25 @@ def find_roll_options(ib, position, config):
         })
     
     # Option 2-4: Find strikes by delta (will include some higher and lower)
-    delta_options = find_strikes_by_delta(ib, symbol, next_expiry, config['target_delta'], spot, current_strike)
+    delta_options = find_strikes_by_delta(ib, symbol, next_expiry, target_delta, spot, current_strike, right)
     for opt in delta_options:
         # Categorize based on strike position
+        # For calls: rolling up increases strike (more conservative)
+        # For puts: rolling down decreases strike (more conservative)
         if abs(opt['strike'] - current_strike) < 1.0:
             opt_type = 'Same Strike'
-        elif opt['strike'] > current_strike:
-            opt_type = f"Roll Up (+${opt['strike'] - current_strike:.0f})"
+        elif right == 'C':
+            # Call options
+            if opt['strike'] > current_strike:
+                opt_type = f"Roll Up (+${opt['strike'] - current_strike:.0f})"
+            else:
+                opt_type = f"Roll Down (-${current_strike - opt['strike']:.0f})"
         else:
-            opt_type = f"Roll Down (-${current_strike - opt['strike']:.0f})"
+            # Put options
+            if opt['strike'] < current_strike:
+                opt_type = f"Roll Down (-${current_strike - opt['strike']:.0f})"
+            else:
+                opt_type = f"Roll Up (+${opt['strike'] - current_strike:.0f})"
         
         net_credit = opt['mark'] - buyback_cost
         
@@ -281,5 +313,6 @@ def find_roll_options(ib, position, config):
         'entry_credit': entry_credit,
         'current_pnl': current_pnl,
         'contracts': position['contracts'],
+        'right': right,  # Include option type for display
         'options': options
     }

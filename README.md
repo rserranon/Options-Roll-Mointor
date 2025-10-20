@@ -4,21 +4,24 @@ A Python-based monitoring tool for covered call positions that automatically ide
 
 ## Overview
 
-This tool connects to your Interactive Brokers TWS/Gateway to monitor short call positions and suggests roll opportunities when positions approach expiration. It helps optimize covered call strategies by:
+This tool connects to your Interactive Brokers TWS/Gateway to monitor short option positions (covered calls and cash-secured puts) and suggests roll opportunities when positions approach expiration. It helps optimize option selling strategies by:
 
 - Monitoring positions in real-time
 - Identifying roll opportunities within configurable DTE thresholds
-- Finding strikes matching target delta requirements
+- Finding strikes matching target delta requirements (0.10 for calls, -0.90 for puts)
 - Calculating net credits and delta impacts for each roll option
 - Displaying comprehensive analysis including $/DTE metrics
 
 ## Features
 
 ### Core Functionality
-- **Automated Position Monitoring**: Tracks all short call positions in your IBKR account
+- **Automated Position Monitoring**: Tracks all short call and put positions in your IBKR account
+- **Dual Strategy Support**: Handles both covered calls and cash-secured puts
 - **Smart Roll Detection**: Identifies roll opportunities approximately 1 week out from current expiry
 - **Target DTE Range**: Constrains roll targets to 30-45 DTE window
-- **Delta-Based Strike Selection**: Finds strikes matching your target delta (default: 0.10)
+- **Delta-Based Strike Selection**: Finds strikes matching your target deltas:
+  - **Calls**: 0.10 delta (default) - ~10% probability of assignment
+  - **Puts**: -0.90 delta (default) - ~10% probability of assignment
 - **Multi-Option Analysis**: Shows same strike, roll up, and roll down opportunities
 - **Net Delta Calculation**: Displays the net delta impact of each roll transaction
 - **Triple ROI Analysis**: Three complementary metrics for informed decision-making
@@ -137,7 +140,8 @@ python3 roll_monitor.py [OPTIONS]
 - `--clientId ID` - Client ID for connection (default: 2)
 
 **Strategy Options:**
-- `--target-delta DELTA` - Target delta for new positions (default: 0.10)
+- `--target-delta-call DELTA` - Target delta for covered calls (default: 0.10)
+- `--target-delta-put DELTA` - Target delta for cash-secured puts (default: -0.90)
 - `--dte-threshold DAYS` - Alert when DTE ≤ this value (default: 14)
 - `--interval SECONDS` - Check interval for continuous mode (default: 300)
 - `--once` - Run a single check and exit
@@ -174,7 +178,7 @@ python3 roll_monitor.py --port 7497
 
 **Custom target delta and check interval:**
 ```bash
-python3 roll_monitor.py --target-delta 0.15 --interval 600
+python3 roll_monitor.py --target-delta-call 0.15 --target-delta-put -0.85 --interval 600
 ```
 
 **Full custom configuration:**
@@ -183,7 +187,8 @@ python3 roll_monitor.py \
   --host 127.0.0.1 \
   --port 7497 \
   --clientId 2 \
-  --target-delta 0.10 \
+  --target-delta-call 0.10 \
+  --target-delta-put -0.90 \
   --dte-threshold 14 \
   --interval 300
 ```
@@ -195,7 +200,8 @@ python3 roll_monitor.py \
 Connecting to 127.0.0.1:7496
 
 📊 Configuration:
-   Target Delta: 0.10
+   Target Delta (Calls): 0.10
+   Target Delta (Puts): -0.90
    Alert when DTE ≤ 14
    Roll window: 30-45 DTE (typically +1 week)
    Check interval: 300s
@@ -204,16 +210,16 @@ Connecting to 127.0.0.1:7496
 ---------------------------------------------------------------------------
 Fetching positions...
 
-Symbol     Strike Expiry      DTE  Qty   Entry$ Current$     P&L$
+Symbol     Type Strike Expiry      DTE  Qty   Entry$ Current$     P&L$
 ---------------------------------------------------------------------------
-MSTR       370.00 20251017      2  2.0     1.29     0.07     1.22
+MSTR         C  370.00 20251017      2  2.0     1.29     0.07     1.22
 
 Scanning 1 position(s)...
 
 ════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
 📊 ROLL OPTIONS AVAILABLE
 ════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
-Symbol: MSTR  |  Spot: $362.50  |  Contracts: 2
+Symbol: MSTR  |  Type: Covered Call  |  Spot: $362.50  |  Contracts: 2
 
 CURRENT POSITION:
   Strike: $370.00  |  Expiry: 20251017  |  DTE: 2  |  Delta: -0.045
@@ -332,7 +338,8 @@ The tool implements a systematic approach to finding roll opportunities:
    - Selects expiry closest to target date
 
 3. **Strike Selection** (Optimized Algorithm):
-   - **Smart Band Selection**: For 0.10 delta target, focuses on OTM strikes between spot+20 and spot+250
+   - **For Calls (0.10 delta)**: Focuses on OTM strikes between spot+20 and spot+250
+   - **For Puts (-0.90 delta)**: Focuses on OTM strikes between spot-250 and spot-20
    - **Even Sampling**: Samples strikes evenly across the band (max 20 strikes)
    - **Early Exit**: Stops after finding 8 options within ±0.05 delta of target
    - **Result**: Returns top 5 strikes closest to target delta

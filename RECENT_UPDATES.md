@@ -1,5 +1,91 @@
 # Recent Updates Summary
 
+## Version: October 17, 2025 - Cash-Secured Puts Support 🎯
+
+### Full Support for Both Covered Calls and Cash-Secured Puts
+
+**What Changed:**
+Extended the tool to monitor and analyze both covered calls AND cash-secured puts, doubling its utility for options traders.
+
+**New Features:**
+
+1. **Dual Position Type Support**
+   - Monitors short calls (covered calls)
+   - Monitors short puts (cash-secured puts)
+   - Separate delta targets for each strategy
+
+2. **Smart Delta Targeting**
+   - **Calls**: Default target 0.10 delta (~10% assignment probability)
+   - **Puts**: Default target -0.90 delta (~10% assignment probability)
+   - Both configurable via command-line arguments
+
+3. **Position Type Display**
+   - Positions summary shows 'C' or 'P' type
+   - Roll options header shows "Covered Call" or "Cash-Secured Put"
+   - Clear visual distinction between strategies
+
+4. **Optimized Strike Selection for Puts**
+   - Calls: Searches spot+20 to spot+250 (OTM above)
+   - Puts: Searches spot-250 to spot-20 (OTM below)
+   - Each optimized for typical delta bands
+
+**New Command-Line Arguments:**
+```bash
+--target-delta-call DELTA    # Default: 0.10 (covered calls)
+--target-delta-put DELTA     # Default: -0.90 (cash-secured puts)
+```
+
+**Usage Examples:**
+```bash
+# Use defaults (0.10 calls, -0.90 puts)
+python3 roll_monitor.py --once
+
+# Custom targets
+python3 roll_monitor.py --target-delta-call 0.15 --target-delta-put -0.85 --once
+
+# Monitor both strategies
+python3 roll_monitor.py --dte-threshold 14
+```
+
+**Output Changes:**
+```
+Symbol     Type Strike Expiry      DTE  Qty   Entry$ Current$     P&L$
+---------------------------------------------------------------------------
+MSTR         C  470.00 20251121     36  1.0     7.03     1.35     5.68
+AAPL         P  220.00 20251121     36  5.0     2.15     0.85     1.30
+```
+
+**Roll Direction Logic:**
+- **Calls**: "Roll Up" = higher strike (more conservative)
+- **Puts**: "Roll Down" = lower strike (more conservative)
+- Labels now make sense for both strategies
+
+**Files Modified:**
+1. **`portfolio.py`** - Detect both calls and puts, add 'right' field
+2. **`options_finder.py`** - Handle both option types in all functions
+3. **`market_data.py`** - Add 'right' parameter to get_option_quote()
+4. **`roll_monitor.py`** - Separate delta arguments, updated config display
+5. **`display.py`** - Show position type in all displays
+6. **`README.md`** - Updated overview, examples, and configuration
+7. **`ARCHITECTURE.md`** - Document dual-strategy support
+
+**Testing:**
+```bash
+# Verify all tests pass
+python3 test_refactor.py  # ✓ ALL TESTS PASSED
+
+# Test with your positions
+python3 roll_monitor.py --dte-threshold 40 --once
+```
+
+**Why This Matters:**
+- Complete strategy coverage: calls AND puts
+- Proper delta targeting for each strategy
+- Same powerful analysis for both position types
+- One tool for your entire options portfolio
+
+---
+
 ## Version: October 17, 2025 - Strike Sampling Optimization 🚀
 
 ### Performance Improvement: 3-4× Faster Scans

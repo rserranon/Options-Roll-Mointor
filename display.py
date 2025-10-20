@@ -58,9 +58,12 @@ def print_roll_options(roll_info, use_colors=True):
     print("📊 ROLL OPTIONS AVAILABLE")
     print("="*150)
     
+    right = roll_info.get('right', 'C')
+    position_type = "Covered Call" if right == 'C' else "Cash-Secured Put"
+    
     spot = roll_info.get('spot')
     spot_str = f"${spot:.2f}" if spot and not math.isnan(spot) else "N/A"
-    print(f"Symbol: {roll_info['symbol']}  |  Spot: {spot_str}  |  Contracts: {roll_info['contracts']}")
+    print(f"Symbol: {roll_info['symbol']}  |  Type: {position_type}  |  Spot: {spot_str}  |  Contracts: {roll_info['contracts']}")
     
     print(f"\nCURRENT POSITION:")
     current_delta = roll_info.get('current_delta')
@@ -175,13 +178,14 @@ def print_positions_summary(positions):
     import math
     
     if not positions:
-        print("  No short call positions found\n")
+        print("  No short option positions found\n")
         return
     
-    print(f"\n{'Symbol':<8} {'Strike':>8} {'Expiry':<10} {'DTE':>4} {'Qty':>4} {'Entry$':>8} {'Current$':>8} {'P&L$':>8}")
-    print("-" * 75)
+    print(f"\n{'Symbol':<8} {'Type':<4} {'Strike':>8} {'Expiry':<10} {'DTE':>4} {'Qty':>4} {'Entry$':>8} {'Current$':>8} {'P&L$':>8}")
+    print("-" * 85)
     for pos in positions:
         current_dte = dte(pos['expiry'])
+        position_type = pos.get('right', 'C')  # 'C' or 'P'
         
         # Handle NaN in current_mark
         current_mark = pos.get('current_mark')
@@ -198,6 +202,6 @@ def print_positions_summary(positions):
         else:
             pnl_str = f"{pnl:8.2f}"
         
-        print(f"{pos['symbol']:<8} {pos['strike']:>8.2f} {pos['expiry']:<10} {current_dte:>4} {pos['contracts']:>4} "
+        print(f"{pos['symbol']:<8} {position_type:^4} {pos['strike']:>8.2f} {pos['expiry']:<10} {current_dte:>4} {pos['contracts']:>4} "
               f"{pos['entry_credit']:>8.2f} {mark_str:>8} {pnl_str:>8}")
     print()

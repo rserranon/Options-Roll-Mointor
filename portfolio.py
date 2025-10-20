@@ -7,7 +7,7 @@ import time
 
 def get_current_positions(ib, retry_attempts=3, initial_wait=1.0):
     """
-    Fetch current short call positions from IBKR account.
+    Fetch current short call and put positions from IBKR account.
     
     Args:
         ib: Connected IB instance
@@ -23,7 +23,8 @@ def get_current_positions(ib, retry_attempts=3, initial_wait=1.0):
     for pos in account_positions:
         contract = pos.contract
         
-        if contract.secType == 'OPT' and pos.position < 0 and contract.right == 'C':
+        # Include both short calls and short puts
+        if contract.secType == 'OPT' and pos.position < 0 and contract.right in ('C', 'P'):
             if not contract.exchange or contract.exchange == '':
                 contract.exchange = 'SMART'
             
@@ -66,6 +67,7 @@ def get_current_positions(ib, retry_attempts=3, initial_wait=1.0):
                 'symbol': contract.symbol,
                 'strike': contract.strike,
                 'expiry': contract.lastTradeDateOrContractMonth,
+                'right': contract.right,  # 'C' for call, 'P' for put
                 'contracts': abs(pos.position),
                 'entry_credit': abs(avg_cost),
                 'current_mark': mark,

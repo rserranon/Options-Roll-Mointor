@@ -60,7 +60,7 @@ def wait_for_greeks(tk: Ticker, timeout=3.0):
     return False
 
 
-def get_option_quote(ib, symbol, expiry, strike, timeout=2.5):
+def get_option_quote(ib, symbol, expiry, strike, right='C', timeout=2.5):
     """
     Get quote and Greeks for a specific option.
     
@@ -69,6 +69,7 @@ def get_option_quote(ib, symbol, expiry, strike, timeout=2.5):
         symbol: Underlying symbol
         expiry: Expiration date (YYYYMMDD)
         strike: Strike price
+        right: 'C' for call or 'P' for put
         timeout: Timeout for Greeks
     
     Returns:
@@ -77,7 +78,7 @@ def get_option_quote(ib, symbol, expiry, strike, timeout=2.5):
     from utils import dte
     
     for ex in FALLBACK_EXCHANGES:
-        opt = Option(symbol, expiry, strike, 'C', exchange=ex, currency='USD', tradingClass=symbol)
+        opt = Option(symbol, expiry, strike, right, exchange=ex, currency='USD', tradingClass=symbol)
         try:
             ib.qualifyContracts(opt)
             tk = ib.reqMktData(opt, "106", False, False)
