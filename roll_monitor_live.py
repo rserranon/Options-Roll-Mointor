@@ -7,6 +7,9 @@ Shows real-time updating display of positions and roll options.
 from datetime import datetime, timezone
 import argparse
 import time
+import sys
+import select
+import threading
 
 from rich.live import Live
 from rich.console import Console
@@ -16,6 +19,36 @@ from portfolio import get_current_positions
 from options_finder import find_roll_options
 from display_live import LiveMonitor
 from utils import dte, get_market_status
+
+
+class InputMonitor:
+    """Monitor for user input to stop the program."""
+    
+    def __init__(self):
+        self.should_stop = False
+        self._lock = threading.Lock()
+    
+    def check_input(self):
+        """Check if user wants to quit (non-blocking)."""
+        if sys.platform == 'win32':
+            import msvcrt
+            if msvcrt.kbhit():
+                key = msvcrt.getch().decode('utf-8', errors='ignore').lower()
+                if key in ('q', '\x03'):  # q or Ctrl+C
+                    with self._lock:
+                        self.should_stop = True
+        else:
+            # Unix-like systems
+            if select.select([sys.stdin], [], [], 0)[0]:
+                key = sys.stdin.read(1).lower()
+                if key in ('q', '\x03'):
+                    with self._lock:
+                        self.should_stop = True
+    
+    def stop_requested(self):
+        """Check if stop was requested."""
+        with self._lock:
+            return self.should_stop
 
 
 def process_position(ib, pos, config):
@@ -194,7 +227,8 @@ def main():
     
     # Brief startup message
     console.print(f"\n🔍 Starting Live Monitor (interval={config['check_interval_seconds']}s, {'realtime' if args.realtime else 'delayed'} data)...", style="cyan")
-    console.print("[yellow]Connecting to TWS and fetching positions (this may take 15-30 seconds)...[/yellow]\n")
+    console.print("[yellow]Connecting to TWS and fetching positions (this may take 15-30 seconds)...[/yellow]")
+    console.print("[dim]Press 'q' or Ctrl+C to quit[/dim]\n")
     
     # Do the initial connection and data fetch BEFORE starting Live display
     # This avoids showing empty tables while waiting for data
@@ -223,6 +257,19 @@ def main():
     
     if not initial_success:
         return
+    
+    # Create input monitor
+    input_monitor = InputMonitor()
+    
+    # Set stdin to non-blocking mode on Unix systems
+    if sys.platform != 'win32':
+        import termios
+        import tty
+        old_settings = termios.tcgetattr(sys.stdin)
+        try:
+            tty.setcbreak(sys.stdin.fileno())
+        except:
+            pass  # If we can't set it, continue without input monitoring
     
     try:
         with Live(monitor.render(), console=console, refresh_per_second=4, transient=False) as live:
@@ -266,12 +313,29 @@ def main():
                 
                 # Countdown to next check
                 for remaining in range(config['check_interval_seconds'], 0, -1):
+                    # Check for quit command
+                    input_monitor.check_input()
+                    if input_monitor.stop_requested():
+                        console.print("\n\n[yellow]Stop requested by user[/yellow]")
+                        break
+                    
                     monitor.update_status(next_check_seconds=remaining)
                     live.update(monitor.render())
                     time.sleep(1)
+                
+                # Break outer loop if stop was requested
+                if input_monitor.stop_requested():
+                    break
     
     except KeyboardInterrupt:
-        console.print("\n\n[yellow]Monitoring stopped by user[/yellow]")
+        console.print("\n\n[yellow]Monitoring stopped by user (Ctrl+C)[/yellow]")
+    finally:
+        # Restore terminal settings on Unix systems
+        if sys.platform != 'win32':
+            try:
+                termios.tcsetattr(sys.stdin, termios.TCSADRAIN, old_settings)
+            except:
+                pass
     
     console.print("\n[green]Done.[/green]\n")
 

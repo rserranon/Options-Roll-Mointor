@@ -291,7 +291,8 @@ python3 roll_monitor.py --once
 
 ## Keyboard Shortcuts
 
-- **Ctrl+C** - Stop monitoring gracefully
+- **q** - Quit the program gracefully (recommended)
+- **Ctrl+C** - Stop monitoring immediately
 - **Cmd+C** (Mac) - Same as Ctrl+C
 
 ## Examples

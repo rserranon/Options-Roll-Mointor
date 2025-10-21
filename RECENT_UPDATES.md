@@ -1,5 +1,97 @@
 # Recent Updates Summary
 
+## Version: October 21, 2025 - Live Monitoring UI with Quit Command 🎨
+
+### Real-Time Updating Display with Rich Library
+
+**What Changed:**
+Added a complete live monitoring interface (`roll_monitor_live.py`) with real-time updating tables and graceful quit functionality.
+
+**New Features:**
+
+1. **Live Updating Display**
+   - Tables update in place (no scrolling output)
+   - Visual countdown to next check
+   - Color-coded status indicators
+   - Activity progress indicators
+   - Professional Rich-based UI
+
+2. **Graceful Quit Command**
+   - Press 'q' to quit cleanly
+   - Ctrl+C for immediate stop
+   - Proper terminal cleanup on exit
+   - Cross-platform support (macOS/Linux/Windows)
+
+3. **Status Panel**
+   - Connection status (connected/disconnected)
+   - Market hours display (OPEN/CLOSED with reason)
+   - Real-time activity indicator
+   - Countdown timer to next check
+   - Last update timestamp
+   - Quit instruction reminder
+
+4. **Enhanced User Experience**
+   - Shows positions immediately on startup
+   - Progress tracking during position analysis
+   - Clear visual feedback during data fetching
+   - Persistent display (no transient flickering)
+
+**New Files:**
+- `roll_monitor_live.py` - Live monitoring main program
+- `display_live.py` - Rich-based display components
+- `LIVE_MONITOR_GUIDE.md` - Complete usage guide
+- `LIVE_MONITOR_QUICK_START.md` - Quick troubleshooting guide
+
+**Usage:**
+```bash
+# Continuous monitoring with live display
+python3 roll_monitor_live.py
+
+# Quick status check
+python3 roll_monitor_live.py --once
+
+# Press 'q' or Ctrl+C to quit
+```
+
+**Command-Line Arguments:**
+```bash
+--interval SECONDS      # Check interval (default: 60)
+--once                  # Run only once
+--dte-threshold DAYS    # Alert when DTE <= this (default: 14)
+--realtime              # Use real-time data (requires subscription)
+--skip-market-check     # Skip market hours check
+--verbose               # Debug output
+```
+
+**Display Components:**
+1. **Status Panel** - Connection, market status, activity, countdown
+2. **Positions Table** - All current short positions with P&L
+3. **Roll Opportunities Table** - Sorted by Capital ROI with color coding
+4. **Summary Panel** - Quick stats (positions, opportunities, errors)
+
+**Technical Implementation:**
+- Uses Rich library's Live display context
+- Non-blocking input monitoring (InputMonitor class)
+- Terminal raw mode for character-by-character input
+- Proper terminal restoration on exit
+- Cross-platform keyboard detection (select/msvcrt)
+- Thread-safe stop flag with locking
+
+**Documentation Updates:**
+- `README.md` - Added live monitor to main usage section
+- `LIVE_MONITOR_GUIDE.md` - Complete feature documentation
+- `LIVE_MONITOR_QUICK_START.md` - Performance tips and troubleshooting
+- `QUICK_REFERENCE.md` - Command comparison table
+
+**Why This Matters:**
+- **Active monitoring**: No more scrolling output during trading hours
+- **Better UX**: See status at a glance with color coding
+- **Faster feedback**: Shows positions immediately while analyzing
+- **Professional look**: Clean, modern terminal UI
+- **Easy exit**: Press 'q' anytime to quit cleanly
+
+---
+
 ## Version: October 17, 2025 - Cash-Secured Puts Support 🎯
 
 ### Full Support for Both Covered Calls and Cash-Secured Puts

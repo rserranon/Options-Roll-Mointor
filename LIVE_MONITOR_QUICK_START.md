@@ -103,6 +103,9 @@ Watch the top bar for activity updates!
 **"Need detailed analysis"**  
 → Use classic monitor: `python3 roll_monitor.py --once`
 
+**"How do I stop it?"**
+→ Press 'q' or Ctrl+C to quit gracefully
+
 ## Example Workflow
 
 ```bash

@@ -18,6 +18,8 @@ python3 roll_monitor_live.py --once
 # Custom interval (2 min)
 python3 roll_monitor_live.py --interval 120
 
+# Press 'q' or Ctrl+C to quit
+
 # Demo the UI
 python3 test_live_ui.py
 ```
@@ -72,6 +74,7 @@ python3 roll_monitor.py --interval 180
 ╭────────────── 📊 Options Roll Monitor ──────────────╮
 │ ● Connected  |  Market: OPEN                        │
 │ Last Update: 14:35:22 UTC  |  Next Check: 45s      │
+│ Press 'q' to quit                                    │
 ╰─────────────────────────────────────────────────────╯
 
 Current Positions
@@ -138,8 +141,14 @@ Roll Up (+$5)    $180.00   20241122   $11.23   3.21%
 
 ## Stop Monitoring
 
-Both monitors:
-- Press **Ctrl+C** to stop gracefully
+**Live Monitor:**
+- Press **'q'** to quit gracefully (recommended)
+- Press **Ctrl+C** to stop immediately
+
+**Classic Monitor:**
+- Press **Ctrl+C** to stop
+
+**Both monitors:**
 - Use **--once** flag for single check
 
 ---

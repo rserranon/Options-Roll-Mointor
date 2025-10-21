@@ -67,6 +67,9 @@ def create_status_panel(status_info):
     if status_info.get('next_check_seconds'):
         status_text.append(f"  |  Next Check: {status_info['next_check_seconds']}s", style="dim")
     
+    status_text.append("\n")
+    status_text.append("Press 'q' to quit", style="dim italic")
+    
     return Panel(status_text, title="📊 Options Roll Monitor", border_style="cyan", padding=(0, 1))
 
 

@@ -21,25 +21,50 @@ The project follows a **layered architecture** pattern:
 ```
 ┌─────────────────────────────────────┐
 │     Presentation Layer              │
-│        (display.py)                 │
+│   Classic: display.py               │
+│   Live: display_live.py             │
 ├─────────────────────────────────────┤
 │     Application Layer               │
-│     (roll_monitor.py)               │
+│   Classic: roll_monitor.py          │
+│   Live: roll_monitor_live.py        │
 ├─────────────────────────────────────┤
 │     Business Logic Layer            │
 │  (options_finder.py, portfolio.py)  │
+│      [Shared by both variants]      │
 ├─────────────────────────────────────┤
 │     Data Access Layer               │
 │  (market_data.py, ib_connection.py) │
+│      [Shared by both variants]      │
 ├─────────────────────────────────────┤
 │     Utility Layer                   │
 │        (utils.py)                   │
+│      [Shared by both variants]      │
 └─────────────────────────────────────┘
 ```
 
+## System Variants
+
+The system now provides two execution modes with different presentation layers:
+
+### Classic Monitor (`roll_monitor.py` + `display.py`)
+- **Scrolling output**: Appends results to terminal
+- **Detailed logging**: Complete timestamped history
+- **Best for**: Analysis, record-keeping, redirection to files
+- **Output**: Plain text with ANSI color codes
+
+### Live Monitor (`roll_monitor_live.py` + `display_live.py`)
+- **In-place updates**: Tables refresh without scrolling
+- **Real-time UI**: Rich library-based interactive display
+- **Best for**: Active monitoring during trading hours
+- **Output**: Rich-formatted tables with status panels
+
+Both variants share the same core business logic layers (portfolio, options_finder, market_data, ib_connection, utils).
+
+---
+
 ## Module Architecture
 
-### 1. `roll_monitor.py` - Application Orchestrator
+### 1. `roll_monitor.py` - Classic Application Orchestrator
 
 **Responsibility**: Main entry point that orchestrates the entire workflow
 
@@ -351,7 +376,141 @@ Interpretation:
 
 ---
 
-### 6. `display.py` - Presentation Layer
+### 1a. `roll_monitor_live.py` - Live Monitoring Orchestrator
+
+**Responsibility**: Main entry point for live monitoring with real-time updating UI
+
+**Key Functions**:
+- `main()` - Entry point with live display management
+- `run_single_check()` - Execute one monitoring iteration
+- `process_position()` - Analyze single position
+- `InputMonitor` - Non-blocking keyboard input handler
+
+**Dependencies**: All shared modules + `display_live`, `rich`
+
+**Flow**:
+1. Parse command-line arguments (same as classic + keyboard handling)
+2. Pre-fetch initial positions before starting Live display
+3. Enter Rich Live display context
+4. Loop:
+   - Run single check with progress indicators
+   - Update display in real-time
+   - Countdown to next check
+   - Monitor for 'q' key press
+5. Clean exit with terminal restoration
+
+**New Features**:
+- **Keyboard Input Monitoring**: Non-blocking detection of 'q' key
+- **Terminal Management**: Sets raw mode, restores on exit
+- **Cross-platform Input**: Uses `select` (Unix) or `msvcrt` (Windows)
+- **Progress Tracking**: Shows activity during each step
+- **Immediate Display**: Shows positions before analysis starts
+
+**Command-Line Arguments** (inherits all from classic plus):
+- Same connection, strategy, and data arguments as classic
+- `--interval` default: 60s (vs 300s for classic)
+
+**Design Notes**:
+- Shares all business logic with classic monitor
+- Adds InputMonitor class for graceful quit
+- Terminal state management for character-by-character input
+- Thread-safe stop flag with locking
+- Proper cleanup in finally block
+
+---
+
+### 6a. `display_live.py` - Live Presentation Layer
+
+**Responsibility**: Format and display results using Rich library with real-time updates
+
+**Key Classes**:
+- `LiveMonitor` - Main display manager class
+
+**Key Functions**:
+- `create_status_panel()` - Connection, market, and activity status
+- `create_positions_table()` - Current positions with P&L
+- `create_roll_opportunities_table()` - Roll options sorted by ROI
+- `create_summary_panel()` - Quick statistics
+- `create_full_display()` - Complete layout assembly
+- `get_roi_style()` - Color determination based on Premium Efficiency
+
+**Dependencies**: `rich`, `utils`
+
+**Design Notes**:
+- Uses Rich library for professional terminal UI
+- Tables update in-place (no scrolling)
+- Live display context for smooth updates
+- Color-coded using Rich Text styles
+- Persistent display (transient=False)
+- Four-panel layout: Status, Positions, Opportunities, Summary
+
+**Display Structure**:
+```
+╭─────────── Status Panel ───────────╮
+│ Connection, Market, Activity       │
+│ Timestamp, Countdown, Quit Msg     │
+╰────────────────────────────────────╯
+
+┏━━━━━ Positions Table ━━━━━┓
+┃ Symbol | Strike | DTE | P&L ┃
+┗━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
+
+┏━━━ Roll Opportunities ━━━━┓
+┃ Type | Strike | ROI% | Eff% ┃
+┗━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
+
+╭─────── Summary Panel ──────╮
+│ Stats: Positions, Opps, Err │
+╰────────────────────────────╯
+```
+
+**LiveMonitor Class**:
+```python
+class LiveMonitor:
+    def __init__(self, config):
+        """Initialize with configuration"""
+    
+    def update_status(self, connected=None, host=None, ...):
+        """Update status information"""
+    
+    def update_positions(self, positions):
+        """Update positions data"""
+    
+    def update_roll_opportunities(self, roll_opportunities):
+        """Update roll opportunities"""
+    
+    def update_summary(self, positions_count, ...):
+        """Update summary statistics"""
+    
+    def render(self):
+        """Render the complete display"""
+```
+
+**Rich Features Used**:
+- `Live` context for updating display
+- `Table` for formatted data
+- `Panel` for bordered sections
+- `Layout` for multi-panel arrangement
+- `Text` for styled content
+- `Console` for output management
+
+**Status Panel Features**:
+- Connection indicator (● green/red)
+- Market status (OPEN/CLOSED with reason)
+- Activity progress indicator
+- Last update timestamp
+- Countdown timer to next check
+- "Press 'q' to quit" reminder
+
+**Color System**:
+- Uses Rich's style system (not ANSI codes)
+- Consistent with classic monitor colors
+- Better terminal compatibility
+- Smoother rendering
+
+---
+
+### 6b. `display.py` - Classic Presentation Layer
 
 **Responsibility**: Format and display results to user with color-coded output
 
@@ -510,6 +669,7 @@ def get_market_status() -> dict:
 
 ### Module Dependencies Graph
 
+**Classic Monitor:**
 ```
 roll_monitor.py
     ├── ib_connection.py
@@ -527,6 +687,28 @@ roll_monitor.py
     │       └── utils.py
     └── utils.py
             └── datetime (stdlib)
+```
+
+**Live Monitor:**
+```
+roll_monitor_live.py
+    ├── ib_connection.py
+    │       └── ib_insync
+    ├── portfolio.py
+    │       ├── ib_insync
+    │       └── market_data.py
+    │               ├── ib_insync
+    │               └── utils.py
+    ├── options_finder.py
+    │       ├── ib_insync
+    │       ├── market_data.py
+    │       └── utils.py
+    ├── display_live.py
+    │       ├── rich
+    │       └── utils.py
+    └── utils.py
+            ├── datetime (stdlib)
+            └── pytz
 ```
 
 **Dependency Rules**:
@@ -716,7 +898,7 @@ python3 roll_monitor.py --once --realtime
 
 ### 11. Modular Architecture
 
-**Decision**: Split into 7 focused modules
+**Decision**: Split into 7 focused modules with dual presentation layers
 
 **Rationale**:
 - Single Responsibility Principle
@@ -724,6 +906,42 @@ python3 roll_monitor.py --once --realtime
 - Reusable components
 - Clear separation of concerns
 - Reduced from ~370 lines to ~100 in main script
+- **Dual UI variants**: Classic (logging-focused) and Live (monitoring-focused)
+- Shared business logic between variants
+
+---
+
+### 12. Dual UI Architecture (Classic vs Live)
+
+**Decision**: Provide two presentation variants sharing the same business logic
+
+**Rationale**:
+- **Different use cases**:
+  - Classic: Detailed analysis, logging, record-keeping
+  - Live: Active monitoring, at-a-glance status
+- **Shared logic**: Both use same core modules (portfolio, options_finder, market_data)
+- **User choice**: Let users pick based on their workflow
+- **Code reuse**: ~80% of code shared between variants
+- **Maintenance**: Business logic updates benefit both UIs
+
+**Classic Monitor Benefits**:
+- Complete timestamped output
+- Easy to redirect to files
+- Grep-able logs
+- No terminal requirements
+- Lightweight (no Rich dependency for existing users)
+
+**Live Monitor Benefits**:
+- Real-time updates without scrolling
+- Visual countdown and progress
+- Professional appearance
+- Better for continuous monitoring
+- Keyboard shortcuts ('q' to quit)
+
+**Implementation**:
+- Classic: ANSI color codes, plain text tables
+- Live: Rich library, interactive panels
+- Both: Same data flow, same calculations, same results
 
 ---
 
@@ -800,7 +1018,9 @@ python3 roll_monitor.py --once --realtime
 - Toggle color output on/off
 
 ### Features
-- Support for put positions
+- ~~Support for put positions~~ ✓ Implemented
+- ~~Live monitoring UI~~ ✓ Implemented with Rich library
+- ~~Keyboard shortcuts for graceful exit~~ ✓ Implemented ('q' to quit)
 - Iron condor management
 - Multi-leg position tracking
 - Historical roll tracking with ROI analysis

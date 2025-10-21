@@ -154,6 +154,8 @@ python3 roll_monitor_live.py
 
 # Quick status check
 python3 roll_monitor_live.py --once
+
+# Press 'q' or Ctrl+C to quit
 ```
 
 **Classic Monitor (Detailed Output):**
