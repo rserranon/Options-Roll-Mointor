@@ -2,6 +2,8 @@
 
 A Python-based monitoring tool for covered call positions that automatically identifies and displays optimal roll opportunities for Interactive Brokers accounts.
 
+**Now with Live Monitoring UI!** 🎉 See [LIVE_MONITOR_GUIDE.md](LIVE_MONITOR_GUIDE.md) for the new real-time updating display.
+
 ## Overview
 
 This tool connects to your Interactive Brokers TWS/Gateway to monitor short option positions (covered calls and cash-secured puts) and suggests roll opportunities when positions approach expiration. It helps optimize option selling strategies by:
@@ -125,17 +127,42 @@ pip install -r requirements.txt
 
 ## Usage
 
+### Two Monitor Options
+
+**📊 Live Monitor** (`roll_monitor_live.py`) - **NEW!**
+- Real-time updating display with Rich UI
+- Tables update in place (no scrolling)
+- Visual countdown to next check
+- Color-coded status indicators
+- Best for: Active monitoring during trading
+
+**📝 Classic Monitor** (`roll_monitor.py`)
+- Detailed text output with timestamps
+- Complete information for each check
+- Easy to log and review history
+- Best for: Detailed analysis and record-keeping
+
+See [LIVE_MONITOR_GUIDE.md](LIVE_MONITOR_GUIDE.md) for full details on the live monitor.
+
 ### Basic Commands
 
-Run a single check:
+**Live Monitor (Real-time UI):**
 
 ```bash
-python3 roll_monitor.py --once
+# Continuous monitoring with live display
+python3 roll_monitor_live.py
+
+# Quick status check
+python3 roll_monitor_live.py --once
 ```
 
-Run continuous monitoring (checks every 5 minutes):
+**Classic Monitor (Detailed Output):**
 
 ```bash
+# Single check with full details
+python3 roll_monitor.py --once
+
+# Continuous monitoring (checks every 5 minutes)
 python3 roll_monitor.py
 ```
 
