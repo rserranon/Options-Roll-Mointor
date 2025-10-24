@@ -30,36 +30,48 @@ def get_current_positions(ib, retry_attempts=3, initial_wait=1.0):
             
             ib.qualifyContracts(contract)
             
-            # Try multiple times to get market data
+            # Try multiple times to get market data with Greeks
             mark = None
             delta = None
+            ticker = None
             
             for attempt in range(retry_attempts):
                 # Request Greeks (tick type 106) to get delta
                 ticker = ib.reqMktData(contract, '106', False, False)
                 
-                # Progressive wait times: 1.0s, 1.5s, 2.0s
-                wait_time = initial_wait * (1 + attempt * 0.5)
+                # Longer progressive wait times for Greeks: 2.0s, 3.0s, 4.0s
+                wait_time = 2.0 + (attempt * 1.0)
                 ib.sleep(wait_time)
                 
-                # Try to get Greeks
-                wait_for_greeks(ticker, timeout=3.0)
+                # Additional wait specifically for Greeks to populate
+                wait_for_greeks(ticker, timeout=4.0)
                 
                 # Get mark price
                 mark = safe_mark(ticker)
                 
-                # Get delta
+                # Get delta from Greeks
                 greeks = ticker.modelGreeks
                 delta = greeks.delta if greeks else None
                 
-                # If we got a valid mark price, we're done
-                if mark is not None and mark > 0:
+                # Success: We have both mark price AND delta
+                if mark is not None and mark > 0 and delta is not None:
                     break
                 
-                # If not last attempt, cancel and retry
+                # Partial success: Have mark but no delta - keep trying
+                if mark is not None and mark > 0 and delta is None:
+                    # Wait a bit longer for Greeks on next attempt
+                    if attempt < retry_attempts - 1:
+                        ib.sleep(1.0)
+                        continue
+                
+                # No mark price yet - cancel and retry
                 if attempt < retry_attempts - 1:
                     ib.cancelMktData(contract)
-                    ib.sleep(0.2)
+                    ib.sleep(0.3)
+            
+            # Clean up market data subscription
+            if ticker:
+                ib.cancelMktData(contract)
             
             avg_cost = pos.avgCost / 100
             

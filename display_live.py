@@ -146,88 +146,203 @@ def create_positions_table(positions):
     return table
 
 
-def create_roll_opportunities_table(roll_data):
-    """Create table showing roll opportunities."""
-    table = Table(
-        title="Roll Opportunities",
-        show_header=True,
-        header_style="bold magenta",
-        border_style="green",
-        show_lines=False,
-        caption="Legend: Colors show Premium Efficiency (Net/Premium) - [bright_green]≥90%[/] [green]≥75%[/] [yellow]≥50%[/] [red]>0%[/] [dark_red]≤0%[/]"
-    )
+def create_roll_opportunities_table(roll_data, max_rolls_per_position=3):
+    """
+    Create grouped tables showing roll opportunities by position.
     
-    table.add_column("Symbol", style="cyan", width=8)
-    table.add_column("Roll Option", width=20)
-    table.add_column("Strike", justify="right", width=9)
-    table.add_column("Expiry", width=11)
-    table.add_column("DTE", justify="right", width=4)
-    table.add_column("Net $", justify="right", width=8)
-    table.add_column("Eff%", justify="right", width=6)
-    table.add_column("ROI%", justify="right", width=6)
-    table.add_column("Ann%", justify="right", width=7)
+    Args:
+        roll_data: List of position roll opportunities
+        max_rolls_per_position: Max rolls to show per position (0 = all)
+    
+    Returns:
+        Layout with separate table for each position
+    """
+    from rich.layout import Layout
+    from rich.panel import Panel
     
     if not roll_data:
-        table.add_row("—", "—", "—", "—", "—", "—", "—", "—", "—")
+        # Empty state
+        table = Table(
+            title="Roll Opportunities",
+            show_header=True,
+            header_style="bold magenta",
+            border_style="green",
+        )
+        table.add_column("Message", style="dim")
+        table.add_row("No roll opportunities found")
         return table
     
-    # Process all roll options from all positions
-    all_options = []
+    # Create a layout to hold all position tables
+    tables = []
+    
     for position_roll in roll_data:
         symbol = position_roll['symbol']
-        for opt in position_roll['options']:
-            all_options.append({
-                'symbol': symbol,
-                'type': opt['type'],
-                'data': opt['data'],
-                'net_credit': opt['net_credit'],
-                'premium_efficiency': opt.get('premium_efficiency', 0),
-                'capital_roi': opt.get('capital_roi', 0),
-                'annualized_roi': opt.get('annualized_roi', 0)
-            })
-    
-    # Sort by capital ROI (best earnings first)
-    all_options.sort(key=lambda x: x.get('capital_roi', -999) if x.get('capital_roi') is not None and not math.isnan(x.get('capital_roi', 0)) else -999, reverse=True)
-    
-    for opt in all_options:
-        data = opt['data']
-        net_credit = opt['net_credit']
-        premium_eff = opt.get('premium_efficiency', 0)
-        capital_roi = opt.get('capital_roi', 0)
-        ann_roi = opt.get('annualized_roi', 0)
+        current_strike = position_roll.get('current_strike', 0)
+        current_dte = position_roll.get('current_dte', 0)
+        right = position_roll.get('right', 'C')
+        contracts = position_roll.get('contracts', 1)
+        options = position_roll['options']
         
-        # Handle NaN values
-        if net_credit is None or math.isnan(net_credit):
-            net_credit = 0
-        if premium_eff is None or math.isnan(premium_eff):
-            premium_eff = 0
-        if capital_roi is None or math.isnan(capital_roi):
-            capital_roi = 0
-        if ann_roi is None or math.isnan(ann_roi):
-            ann_roi = 0
+        # Determine target delta based on position type
+        target_delta = 0.10 if right == 'C' else -0.90
         
-        # Format strings
-        net_str = f"${net_credit:.2f}" if net_credit >= 0 else f"-${abs(net_credit):.2f}"
-        eff_str = f"{premium_eff:.1f}%" if not math.isnan(premium_eff) else "N/A"
-        roi_str = f"{capital_roi:.2f}%" if not math.isnan(capital_roi) else "N/A"
-        ann_str = f"{ann_roi:.1f}%" if not math.isnan(ann_roi) else "N/A"
+        # Sort options by delta closeness to target (primary), then ROI (secondary)
+        def sort_key(opt):
+            delta = opt['data'].get('delta', 0)
+            roi = opt.get('capital_roi', 0)
+            
+            # Handle NaN values
+            if delta is None or math.isnan(delta):
+                delta_distance = 999  # Push to end
+            else:
+                # Distance from target delta
+                delta_distance = abs(abs(delta) - abs(target_delta))
+            
+            if roi is None or math.isnan(roi):
+                roi = -999
+            
+            # Primary sort: delta closeness (smaller distance = better)
+            # Secondary sort: ROI (higher = better)
+            # Negative ROI to sort descending
+            return (delta_distance, -roi)
         
-        # Get style based on premium efficiency
-        row_style = get_roi_style(premium_eff)
+        sorted_options = sorted(options, key=sort_key)
         
-        table.add_row(
-            opt['symbol'],
-            opt['type'],
-            f"${data['strike']:.2f}",
-            data['expiry'],
-            str(data['dte']),
-            Text(net_str, style=row_style),
-            Text(eff_str, style=row_style),
-            Text(roi_str, style=row_style),
-            Text(ann_str, style=row_style)
+        # Limit to top N
+        total_rolls = len(sorted_options)
+        if max_rolls_per_position > 0:
+            display_options = sorted_options[:max_rolls_per_position]
+            remaining = total_rolls - max_rolls_per_position
+        else:
+            display_options = sorted_options
+            remaining = 0
+        
+        # Create title showing position info
+        title = f"{symbol} ${current_strike:.0f}{right} {current_dte}d ({int(contracts)}x)"
+        if remaining > 0:
+            title += f" → Top {max_rolls_per_position} (closest to Δ{target_delta:.2f})"
+        else:
+            title += f" → {total_rolls} roll(s)"
+        
+        # Create table for this position
+        table = Table(
+            title=title,
+            show_header=True,
+            header_style="bold magenta",
+            border_style="green",
+            show_lines=False,
+            padding=(0, 1)
         )
+        
+        # Columns (without Symbol and Current - they're in the title)
+        table.add_column("Roll", width=16)
+        table.add_column("Strike", justify="right", width=8)
+        table.add_column("Expiry", width=10)
+        table.add_column("DTE", justify="right", width=4)
+        table.add_column("Qty", justify="right", width=4)
+        table.add_column("NewΔ", justify="right", width=7)
+        table.add_column("NetΔ", justify="right", width=7)
+        table.add_column("Roll $", justify="right", width=7)  # NEW: Roll price (premium)
+        table.add_column("Net $", justify="right", width=8)
+        table.add_column("Total $", justify="right", width=9)
+        table.add_column("Eff%", justify="right", width=6)
+        table.add_column("ROI%", justify="right", width=6)
+        table.add_column("Ann%", justify="right", width=6)
+        table.add_column("$/DTE", justify="right", width=7)
+        
+        # Add rows
+        for idx, opt in enumerate(display_options):
+            data = opt['data']
+            net_credit = opt['net_credit']
+            net_delta = opt.get('net_delta', 0)
+            premium_eff = opt.get('premium_efficiency', 0)
+            capital_roi = opt.get('capital_roi', 0)
+            ann_roi = opt.get('annualized_roi', 0)
+            
+            # Handle NaN values
+            if net_credit is None or math.isnan(net_credit):
+                net_credit = 0
+            if net_delta is None or math.isnan(net_delta):
+                net_delta = 0
+            if premium_eff is None or math.isnan(premium_eff):
+                premium_eff = 0
+            if capital_roi is None or math.isnan(capital_roi):
+                capital_roi = 0
+            if ann_roi is None or math.isnan(ann_roi):
+                ann_roi = 0
+            
+            # Format roll option name (with star for best delta match)
+            roll_name = opt['type']
+            if idx == 0:  # Best delta match (now sorted by delta closeness)
+                roll_name = f"★ {roll_name}"
+            
+            # New delta
+            new_delta = data.get('delta', 0)
+            new_delta_str = f"{new_delta:.3f}" if new_delta is not None and not math.isnan(new_delta) else "N/A"
+            
+            # Net delta change
+            net_delta_str = f"{net_delta:+.3f}" if not math.isnan(net_delta) else "N/A"
+            
+            # Roll price (premium of new option)
+            roll_price = data.get('mark', 0)
+            roll_price_str = f"${roll_price:.2f}" if roll_price is not None and not math.isnan(roll_price) else "N/A"
+            
+            # Net credit
+            net_str = f"${net_credit:.2f}" if net_credit >= 0 else f"-${abs(net_credit):.2f}"
+            
+            # Total cash generated
+            total_income = net_credit * contracts * 100
+            total_str = f"${total_income:,.0f}" if not math.isnan(total_income) else "N/A"
+            
+            # Percentages
+            eff_str = f"{premium_eff:.1f}%" if not math.isnan(premium_eff) else "N/A"
+            roi_str = f"{capital_roi:.2f}%" if not math.isnan(capital_roi) else "N/A"
+            ann_str = f"{ann_roi:.1f}%" if not math.isnan(ann_roi) else "N/A"
+            
+            # Dollars per DTE
+            dte = data.get('dte', 0)
+            if dte > 0 and not math.isnan(net_credit):
+                per_dte = net_credit / dte
+                per_dte_str = f"${per_dte:.3f}"
+            else:
+                per_dte_str = "N/A"
+            
+            # Get style based on premium efficiency
+            row_style = get_roi_style(premium_eff)
+            
+            table.add_row(
+                Text(roll_name, style=row_style),
+                f"${data['strike']:.2f}",
+                data['expiry'],
+                str(data['dte']),
+                str(int(contracts)),
+                Text(new_delta_str, style=row_style),
+                Text(net_delta_str, style=row_style),
+                Text(roll_price_str, style=row_style),  # NEW: Roll price
+                Text(net_str, style=row_style),
+                Text(total_str, style=row_style),
+                Text(eff_str, style=row_style),
+                Text(roi_str, style=row_style),
+                Text(ann_str, style=row_style),
+                Text(per_dte_str, style=row_style)
+            )
+        
+        # Add footer if there are more rolls
+        if remaining > 0:
+            table.caption = f"[dim]... {remaining} more roll(s) available[/dim]"
+        
+        tables.append(table)
     
-    return table
+    # If only one position, return the table directly
+    if len(tables) == 1:
+        return tables[0]
+    
+    # Multiple positions - create layout with all tables
+    # Stack them vertically
+    layout = Layout()
+    layout.split_column(*[Layout(t, size=len(display_options) + 4) for t in tables])
+    
+    return layout
 
 
 def create_summary_panel(summary_info):
@@ -259,21 +374,21 @@ def create_summary_panel(summary_info):
     return Panel(text, title="Summary", border_style="dim", padding=(0, 1))
 
 
-def create_full_display(display_data):
+def create_full_display(display_data, max_rolls_per_position=3):
     """Create the complete display layout."""
     layout = Layout()
     
     # Create panels
     status_panel = create_status_panel(display_data['status'])
-    positions_table = create_positions_table(display_data['positions'])
-    roll_table = create_roll_opportunities_table(display_data['roll_opportunities'])
+    # NOTE: Positions table removed - info is shown in roll opportunity headers
+    roll_content = create_roll_opportunities_table(display_data['roll_opportunities'], max_rolls_per_position)
     summary_panel = create_summary_panel(display_data['summary'])
     
-    # Build layout
+    # Build layout (without positions table to save vertical space)
+    # Roll content might be a Layout (multiple tables) or a single Table
     layout.split_column(
         Layout(status_panel, size=5),
-        Layout(positions_table, name="positions"),
-        Layout(roll_table, name="rolls"),
+        Layout(roll_content, name="rolls"),
         Layout(summary_panel, size=3),
     )
     
@@ -287,6 +402,7 @@ class LiveMonitor:
         """Initialize live monitor."""
         self.config = config
         self.console = Console()
+        self.max_rolls_per_position = config.get('max_rolls_per_position', 2)  # Default 2 for space
         self.display_data = {
             'status': {
                 'connected': False,
@@ -342,4 +458,4 @@ class LiveMonitor:
     
     def render(self):
         """Render the current display."""
-        return create_full_display(self.display_data)
+        return create_full_display(self.display_data, self.max_rolls_per_position)

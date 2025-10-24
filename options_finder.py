@@ -79,49 +79,51 @@ def find_strikes_by_delta(ib, symbol, expiry, target_delta, spot, current_strike
             continue
         
         # Smart band selection optimized for target delta
-        # ±20 and ±250 are empirical strike offsets that define a plausible window around spot where 
-        # the target delta (e.g., 0.10 or –0.90) is most likely to occur.
         if spot:
             if right == 'C':
                 # Call options
                 if target_delta < 0.15:
-                    # For low delta (0.10): focus on OTM strikes
-                    # 0.10 delta typically lives between spot+20 to spot+250
-                    band = [k for k in strikes if (spot + 20) <= k <= (spot + 250)]
+                    # For low delta (0.10): focus on OTM strikes WELL ABOVE spot
+                    # 0.10 delta typically lives between spot+5% to spot+15%
+                    # For $390 stock: $410 to $445 range
+                    lower_bound = spot * 1.05  # 5% above spot
+                    upper_bound = spot * 1.15  # 15% above spot
+                    band = [k for k in strikes if lower_bound <= k <= upper_bound]
                 else:
                     # For higher delta: closer to spot
                     band = [k for k in strikes if (spot - 50) <= k <= (spot + 150)]
             else:
                 # Put options
                 if target_delta < -0.85:
-                    # For low delta puts (-0.90): focus on deep OTM (far below spot)
-                    # -0.90 delta typically lives between spot-250 to spot-20
-                    band = [k for k in strikes if (spot - 250) <= k <= (spot - 20)]
+                    # For low delta puts (-0.90): focus on OTM strikes WELL BELOW spot
+                    # -0.90 delta typically lives between spot-15% to spot-5%
+                    # For $390 stock: $332 to $371 range
+                    lower_bound = spot * 0.85  # 15% below spot
+                    upper_bound = spot * 0.95  # 5% below spot
+                    band = [k for k in strikes if lower_bound <= k <= upper_bound]
                 else:
                     # For higher delta puts: closer to spot
                     band = [k for k in strikes if (spot - 150) <= k <= (spot + 50)]
             
-            # Sample evenly across band (max 20 strikes)
-            if len(band) > 20:
-                step = len(band) // 20
-                # sample the full list, every step ::step, for a maximum
-                # of 20 elements [:20]
-                sample = band[::step][:20]
-            else:
+            # For small bands, use ALL strikes (no sampling)
+            # For larger bands, use denser sampling to avoid missing strikes
+            if len(band) <= 40:
+                # Band is small enough - check all strikes
                 sample = band
+            else:
+                # Band is large - use dense sampling
+                # Take every 2nd strike to keep it manageable but thorough
+                sample = band[::2][:40]
         else:
             # Fallback if no spot price (should be rare during market hours)
             sample = strikes[:20]
         
-        # Get quotes with early exit
+        # Get quotes - check more strikes to find all near target
         options = []
         delta_tolerance = 0.05  # Accept deltas within ±0.05 of target
         
         for k in sample:
-            # Early exit: stop after finding 8 options in acceptable delta range
-            if len([o for o in options if abs(abs(o['delta']) - abs(target_delta)) <= delta_tolerance]) >= 8:
-                break
-            
+            # Don't early exit - check all sampled strikes for completeness
             opt_data = get_option_quote(ib, symbol, expiry, k, right=right)
             if opt_data and opt_data['delta'] is not None:
                 options.append(opt_data)
@@ -132,8 +134,8 @@ def find_strikes_by_delta(ib, symbol, expiry, target_delta, spot, current_strike
         # Sort by delta closeness to target (using absolute values for comparison)
         options.sort(key=lambda o: abs(abs(o['delta']) - abs(target_delta)))
         
-        # Return top 5 closest to target delta for comparison
-        return options[:5]
+        # Return top 12 closest to target delta (increased for maximum coverage)
+        return options[:12]
     
     return []
 

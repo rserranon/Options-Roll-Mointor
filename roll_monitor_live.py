@@ -127,12 +127,12 @@ def run_single_check(args, config, monitor, live=None):
         return False
     
     try:
-        # Get positions (use fewer retries for live mode to be faster)
+        # Get positions (increased retries for better Greeks data)
         monitor.update_status(activity="Fetching positions...")
         if args.verbose:
             with open('/tmp/roll_monitor_debug.log', 'a') as f:
                 f.write("  Fetching positions...\n")
-        positions = get_current_positions(ib, retry_attempts=2)  # Reduced from 3-4 for speed
+        positions = get_current_positions(ib, retry_attempts=4)  # Increased for Greeks
         if args.verbose:
             with open('/tmp/roll_monitor_debug.log', 'a') as f:
                 f.write(f"  Got {len(positions)} positions\n")
@@ -170,6 +170,16 @@ def run_single_check(args, config, monitor, live=None):
             
             if result_type == 'options_found' and data:
                 roll_opportunities.append(data)
+                # PROGRESSIVE DISPLAY: Update immediately after each position
+                monitor.update_roll_opportunities(roll_opportunities)
+                monitor.update_summary(
+                    positions_count=len(positions),
+                    options_found=counters['options_found'],
+                    skipped_expiring=counters['skip_expiring'],
+                    errors=counters['error'] + counters['exception']
+                )
+                if live:
+                    live.update(monitor.render())
         
         # Update display with results
         monitor.update_status(activity=None)
@@ -207,6 +217,7 @@ def main():
     ap.add_argument("--target-delta-put", type=float, default=-0.90, help="Target delta for cash-secured puts")
     ap.add_argument("--dte-threshold", type=int, default=14, help="Alert when DTE <= this")
     ap.add_argument("--interval", type=int, default=60, help="Check interval in seconds (default: 60)")
+    ap.add_argument("--max-rolls", type=int, default=2, help="Max rolls to show per position (0=all, default: 2)")
     ap.add_argument("--once", action="store_true", help="Run only once")
     ap.add_argument("--skip-market-check", action="store_true", help="Skip market hours check")
     ap.add_argument("--verbose", "-v", action="store_true", help="Verbose output for debugging")
@@ -218,6 +229,7 @@ def main():
         'target_delta_put': args.target_delta_put,
         'dte_threshold_for_alert': args.dte_threshold,
         'check_interval_seconds': args.interval,
+        'max_rolls_per_position': args.max_rolls,
         'verbose': args.verbose
     }
     
