@@ -263,7 +263,7 @@ def main():
     ap.add_argument("--target-delta-call", type=float, default=0.10, help="Target delta for covered calls")
     ap.add_argument("--target-delta-put", type=float, default=-0.90, help="Target delta for cash-secured puts")
     ap.add_argument("--dte-threshold", type=int, default=14, help="Alert when DTE <= this")
-    ap.add_argument("--interval", type=int, default=60, help="Check interval in seconds (default: 60)")
+    ap.add_argument("--interval", type=int, default=60, help="Check interval in seconds when market open (default: 60, auto-extends to 30min when closed)")
     ap.add_argument("--max-rolls", type=int, default=2, help="Max rolls to show per position (0=all, default: 2)")
     ap.add_argument("--once", action="store_true", help="Run only once")
     ap.add_argument("--skip-market-check", action="store_true", help="Skip market hours check")
@@ -370,8 +370,22 @@ def main():
                     time.sleep(3)  # Show final results for 3 seconds
                     break
                 
+                # Determine sleep interval based on market status
+                # Use longer interval when market is closed to reduce unnecessary checks
+                if not args.skip_market_check:
+                    market_status = get_market_status()
+                    monitor.update_status(market_status=market_status)
+                    if not market_status['is_open']:
+                        # Market closed: use 30-minute interval (or user interval if longer)
+                        sleep_interval = max(1800, config['check_interval_seconds'])
+                    else:
+                        # Market open: use configured interval
+                        sleep_interval = config['check_interval_seconds']
+                else:
+                    sleep_interval = config['check_interval_seconds']
+                
                 # Countdown to next check
-                for remaining in range(config['check_interval_seconds'], 0, -1):
+                for remaining in range(sleep_interval, 0, -1):
                     # Check for quit command
                     input_monitor.check_input()
                     if input_monitor.stop_requested():
