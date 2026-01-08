@@ -53,30 +53,70 @@ class InputMonitor:
 
 def process_position(ib, pos, config):
     """
-    Process a single position and return result.
+    Process a single position and return result with timeout protection.
     
     Returns:
         tuple: (result_type, data)
     """
+    import signal
+    import logging
+    
+    # Setup logging
+    logging.basicConfig(
+        level=logging.INFO,  # Changed from DEBUG to reduce noise
+        format='%(asctime)s [%(levelname)s] %(message)s',
+        handlers=[
+            logging.FileHandler('/tmp/roll_monitor_debug.log'),
+            # Removed StreamHandler to prevent screen output
+        ]
+    )
+    logger = logging.getLogger(__name__)
+    
+    logger.info(f"="*80)
+    logger.info(f"Starting analysis for position: {pos.get('symbol')} ${pos.get('strike')}{pos.get('right')} exp={pos.get('expiry')}")
+    logger.info(f"Position details: {pos}")
+    
+    def timeout_handler(signum, frame):
+        logger.error("TIMEOUT: Position analysis exceeded 90 seconds!")
+        raise TimeoutError("Position analysis timed out")
+    
     try:
+        # Set 90-second alarm for entire position analysis
+        signal.signal(signal.SIGALRM, timeout_handler)
+        signal.alarm(90)
+        
+        logger.info("Calling find_roll_options...")
         roll_info = find_roll_options(ib, pos, config)
+        logger.info(f"find_roll_options returned: {roll_info}")
+        
+        # Cancel alarm if completed
+        signal.alarm(0)
         
         if not roll_info:
             current_dte = dte(pos['expiry'])
+            logger.info(f"No roll info returned, DTE={current_dte}")
             if current_dte > config['dte_threshold_for_alert']:
                 return 'not_ready', None
             return 'no_options', None
         
         if 'error' in roll_info:
             error_type = roll_info['error']
+            logger.warning(f"Roll info contains error: {error_type}")
             if error_type == 'skip_expiring':
                 return 'skip_expiring', None
             else:
                 return 'error', None
         
+        logger.info("Position analysis completed successfully!")
         return 'options_found', roll_info
         
+    except TimeoutError as e:
+        signal.alarm(0)  # Cancel alarm
+        logger.error(f"TimeoutError caught: {e}")
+        return 'exception', None
     except Exception as e:
+        signal.alarm(0)  # Cancel alarm
+        logger.error(f"Exception caught: {type(e).__name__}: {e}", exc_info=True)
         return 'exception', None
 
 
@@ -132,7 +172,7 @@ def run_single_check(args, config, monitor, live=None):
         if args.verbose:
             with open('/tmp/roll_monitor_debug.log', 'a') as f:
                 f.write("  Fetching positions...\n")
-        positions = get_current_positions(ib, retry_attempts=4)  # Increased for Greeks
+        positions = get_current_positions(ib, retry_attempts=2)  # Optimized retry attempts
         if args.verbose:
             with open('/tmp/roll_monitor_debug.log', 'a') as f:
                 f.write(f"  Got {len(positions)} positions\n")
@@ -164,6 +204,7 @@ def run_single_check(args, config, monitor, live=None):
             monitor.update_status(activity=f"Analyzing position {idx}/{len(positions)}: {pos['symbol']} ${pos['strike']:.0f}{pos['right']}...")
             if live:
                 live.update(monitor.render())
+                time.sleep(0.1)  # Small delay to reduce flicker
             
             result_type, data = process_position(ib, pos, config)
             counters[result_type] += 1
@@ -180,9 +221,15 @@ def run_single_check(args, config, monitor, live=None):
                 )
                 if live:
                     live.update(monitor.render())
+                    time.sleep(0.1)  # Small delay to reduce flicker
         
         # Update display with results
-        monitor.update_status(activity=None)
+        # Get cache statistics
+        from greeks_cache import get_cache
+        cache = get_cache()
+        cache_stats = cache.get_stats()
+        
+        monitor.update_status(activity=None, cache_stats=cache_stats)
         monitor.update_roll_opportunities(roll_opportunities)
         monitor.update_summary(
             positions_count=len(positions),
@@ -284,7 +331,7 @@ def main():
             pass  # If we can't set it, continue without input monitoring
     
     try:
-        with Live(monitor.render(), console=console, refresh_per_second=4, transient=False) as live:
+        with Live(monitor.render(), console=console, refresh_per_second=1, transient=False) as live:
             iteration = 0
             
             if args.verbose:

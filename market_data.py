@@ -4,6 +4,7 @@ Market data and quote helpers.
 from ib_insync import Ticker, Option, Stock
 import time
 from utils import FALLBACK_EXCHANGES
+from greeks_cache import get_cache
 
 
 def safe_mark(tk: Ticker, verbose=False):
@@ -43,7 +44,7 @@ def safe_mark(tk: Ticker, verbose=False):
 
 def wait_for_greeks(tk: Ticker, timeout=3.0):
     """
-    Wait for option Greeks to populate.
+    Wait for option Greeks to populate with adaptive polling.
     
     Args:
         tk: Ticker object
@@ -52,17 +53,27 @@ def wait_for_greeks(tk: Ticker, timeout=3.0):
     Returns:
         True if Greeks are available, False otherwise
     """
-    end = time.time() + timeout
+    start_time = time.time()
+    end = start_time + timeout
     while time.time() < end:
         if tk.modelGreeks and tk.modelGreeks.delta is not None:
             return True
-        time.sleep(0.12)
+        
+        # Adaptive polling: start fast, then slow down
+        elapsed = time.time() - start_time
+        if elapsed < 0.5:
+            time.sleep(0.05)  # Fast polling first 500ms
+        elif elapsed < 1.5:
+            time.sleep(0.10)  # Medium polling next 1s
+        else:
+            time.sleep(0.20)  # Slower polling if taking long
     return False
 
 
-def get_option_quote(ib, symbol, expiry, strike, right='C', timeout=2.5):
+def get_option_quote(ib, symbol, expiry, strike, right='C', timeout=2.5, use_cache=True, cache_ttl=60):
     """
     Get quote and Greeks for a specific option.
+    Uses caching to reduce API calls.
     
     Args:
         ib: Connected IB instance
@@ -71,14 +82,26 @@ def get_option_quote(ib, symbol, expiry, strike, right='C', timeout=2.5):
         strike: Strike price
         right: 'C' for call or 'P' for put
         timeout: Timeout for Greeks
+        use_cache: Whether to use cache (default: True)
+        cache_ttl: Cache TTL in seconds (default: 60)
     
     Returns:
         Dictionary with option data or None
     """
     from utils import dte
     
+    # Try cache first
+    if use_cache:
+        cache = get_cache(ttl_seconds=cache_ttl)
+        cached_data = cache.get(symbol, expiry, strike, right)
+        if cached_data is not None:
+            # Cache hit!
+            return cached_data
+    
+    # Cache miss - fetch from IB
     for ex in FALLBACK_EXCHANGES:
         opt = Option(symbol, expiry, strike, right, exchange=ex, currency='USD', tradingClass=symbol)
+        tk = None
         try:
             ib.qualifyContracts(opt)
             tk = ib.reqMktData(opt, "106", False, False)
@@ -89,7 +112,7 @@ def get_option_quote(ib, symbol, expiry, strike, right='C', timeout=2.5):
             greeks = tk.modelGreeks
             
             if mark is not None:
-                return {
+                data = {
                     'strike': strike,
                     'expiry': expiry,
                     'bid': tk.bid,
@@ -101,41 +124,94 @@ def get_option_quote(ib, symbol, expiry, strike, right='C', timeout=2.5):
                     'iv': greeks.impliedVol if greeks else None,
                     'dte': dte(expiry)
                 }
+                
+                # Clean up market data subscription
+                ib.cancelMktData(opt)
+                
+                # Store in cache
+                if use_cache:
+                    cache.put(symbol, expiry, strike, right, data)
+                
+                return data
         except Exception:
             continue
+        finally:
+            # Always clean up market data subscription
+            if tk:
+                try:
+                    ib.cancelMktData(opt)
+                except Exception:
+                    pass
     return None
 
 
-def get_stock_price(ib, symbol):
+def get_stock_price(ib, symbol, use_cache=True, cache_ttl=30):
     """
-    Get current stock price.
+    Get current stock price with optional caching.
     
     Args:
         ib: Connected IB instance
         symbol: Stock symbol
+        use_cache: Whether to use cache (default: True)
+        cache_ttl: Cache TTL in seconds (default: 30)
     
     Returns:
         Current price or None
     """
+    # Try cache first
+    if use_cache:
+        cache = get_cache(ttl_seconds=cache_ttl)
+        cached = cache.get(symbol, 'STOCK', 0, 'STOCK')
+        if cached:
+            return cached.get('price')
+    
+    # Cache miss - fetch from IB
     # Try NASDAQ first
     for exchange in ['NASDAQ', 'NYSE', 'SMART']:
+        stkt = None
         try:
             stk = Stock(symbol, 'SMART', 'USD', primaryExchange=exchange)
             ib.qualifyContracts(stk)
             stkt = ib.reqMktData(stk, '', False, False)
             ib.sleep(0.8)
             price = safe_mark(stkt)
+            
+            # Clean up subscription
+            ib.cancelMktData(stk)
+            
             if price is not None and price > 0:
+                # Cache the result
+                if use_cache:
+                    cache.put(symbol, 'STOCK', 0, 'STOCK', {'price': price})
                 return price
         except Exception:
+            if stkt:
+                try:
+                    ib.cancelMktData(stk)
+                except:
+                    pass
             continue
     
     # Last resort - try without primaryExchange
+    stkt = None
     try:
         stk = Stock(symbol, 'SMART', 'USD')
         ib.qualifyContracts(stk)
         stkt = ib.reqMktData(stk, '', False, False)
         ib.sleep(0.8)
-        return safe_mark(stkt)
+        price = safe_mark(stkt)
+        
+        # Clean up subscription
+        ib.cancelMktData(stk)
+        
+        # Cache the result if we got one
+        if use_cache and price is not None:
+            cache.put(symbol, 'STOCK', 0, 'STOCK', {'price': price})
+        return price
     except Exception:
+        if stkt:
+            try:
+                ib.cancelMktData(stk)
+            except:
+                pass
         return None

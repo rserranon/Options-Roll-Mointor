@@ -5,7 +5,7 @@ from market_data import safe_mark, wait_for_greeks
 import time
 
 
-def get_current_positions(ib, retry_attempts=3, initial_wait=1.0):
+def get_current_positions(ib, retry_attempts=2, initial_wait=1.0):
     """
     Fetch current short call and put positions from IBKR account.
     
@@ -39,12 +39,12 @@ def get_current_positions(ib, retry_attempts=3, initial_wait=1.0):
                 # Request Greeks (tick type 106) to get delta
                 ticker = ib.reqMktData(contract, '106', False, False)
                 
-                # Longer progressive wait times for Greeks: 2.0s, 3.0s, 4.0s
-                wait_time = 2.0 + (attempt * 1.0)
+                # Optimized wait times: 1.5s first attempt, 2.0s subsequent
+                wait_time = 1.5 if attempt == 0 else 2.0
                 ib.sleep(wait_time)
                 
-                # Additional wait specifically for Greeks to populate
-                wait_for_greeks(ticker, timeout=4.0)
+                # Additional wait specifically for Greeks to populate (reduced from 4.0s)
+                wait_for_greeks(ticker, timeout=2.5)
                 
                 # Get mark price
                 mark = safe_mark(ticker)

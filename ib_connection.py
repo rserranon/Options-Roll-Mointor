@@ -2,6 +2,7 @@
 IBKR connection management.
 """
 from ib_insync import IB
+import logging
 
 
 def connect_ib(host="127.0.0.1", port=7496, client_id=2, readonly=True, realtime=False):
@@ -18,6 +19,9 @@ def connect_ib(host="127.0.0.1", port=7496, client_id=2, readonly=True, realtime
     Returns:
         Connected IB instance
     """
+    # Disable ib_insync's verbose logging
+    logging.getLogger('ib_insync').setLevel(logging.WARNING)
+    
     ib = IB()
     ib.connect(host, port, clientId=client_id, readonly=readonly)
     

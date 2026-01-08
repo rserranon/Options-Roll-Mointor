@@ -51,6 +51,22 @@ def create_status_panel(status_info):
         status_text.append("CLOSED", style="red")
         status_text.append(f" ({market_status.get('reason', 'Unknown')})", style="dim")
     
+    # Cache statistics
+    cache_stats = status_info.get('cache_stats')
+    if cache_stats:
+        status_text.append("  |  ", style="dim")
+        hit_rate = cache_stats.get('hit_rate', 0)
+        hits = cache_stats.get('hits', 0)
+        total = cache_stats.get('total_requests', 0)
+        if hit_rate >= 70:
+            style = "bright_green"
+        elif hit_rate >= 50:
+            style = "yellow"
+        else:
+            style = "red"
+        status_text.append(f"Cache: {hit_rate:.0f}%", style=style)
+        status_text.append(f" ({hits}/{total})", style="dim")
+    
     # Activity status
     activity = status_info.get('activity')
     if activity:
@@ -423,7 +439,7 @@ class LiveMonitor:
             }
         }
     
-    def update_status(self, connected=None, host=None, port=None, market_status=None, next_check_seconds=None, activity=None):
+    def update_status(self, connected=None, host=None, port=None, market_status=None, next_check_seconds=None, activity=None, cache_stats=None):
         """Update status information."""
         if connected is not None:
             self.display_data['status']['connected'] = connected
@@ -437,6 +453,8 @@ class LiveMonitor:
             self.display_data['status']['next_check_seconds'] = next_check_seconds
         if activity is not None:
             self.display_data['status']['activity'] = activity
+        if cache_stats is not None:
+            self.display_data['status']['cache_stats'] = cache_stats
         self.display_data['status']['timestamp'] = datetime.now(timezone.utc)
     
     def update_positions(self, positions):
