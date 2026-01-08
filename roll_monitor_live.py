@@ -77,13 +77,13 @@ def process_position(ib, pos, config):
     logger.info(f"Position details: {pos}")
     
     def timeout_handler(signum, frame):
-        logger.error("TIMEOUT: Position analysis exceeded 90 seconds!")
+        logger.error("TIMEOUT: Position analysis exceeded 150 seconds!")
         raise TimeoutError("Position analysis timed out")
     
     try:
-        # Set 90-second alarm for entire position analysis
+        # Set 150-second alarm for entire position analysis (increased for large option chains)
         signal.signal(signal.SIGALRM, timeout_handler)
-        signal.alarm(90)
+        signal.alarm(150)
         
         logger.info("Calling find_roll_options...")
         roll_info = find_roll_options(ib, pos, config)
