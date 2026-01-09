@@ -160,7 +160,7 @@ def get_strike_data_parallel(ib, symbol, expiry, strikes, right='C', max_workers
     return results
 
 
-def find_strikes_by_delta(ib, symbol, expiry, target_delta, spot, current_strike, right='C', use_parallel=False):
+def find_strikes_by_delta(ib, symbol, expiry, target_delta, spot, current_strike, right='C', use_parallel=False, delta_tolerance=0.03):
     """
     Find strikes near target delta for the given expiry.
     Optimized for specific delta targets with smart band selection and early exit.
@@ -175,6 +175,7 @@ def find_strikes_by_delta(ib, symbol, expiry, target_delta, spot, current_strike
         spot: Current stock price
         current_strike: Current position's strike
         right: 'C' for call or 'P' for put
+        delta_tolerance: Maximum deviation from target delta (default 0.03)
     
     Returns:
         List of option data dictionaries
@@ -271,7 +272,6 @@ def find_strikes_by_delta(ib, symbol, expiry, target_delta, spot, current_strike
         else:
             # Sequential fetching with early exit
             options = []
-            delta_tolerance = 0.03  # Accept deltas within ±0.03 of target (tighter)
             good_options_count = 0
             target_good_options = 8  # Early exit after finding 8 near target
             
@@ -297,11 +297,23 @@ def find_strikes_by_delta(ib, symbol, expiry, target_delta, spot, current_strike
         if not options:
             continue
         
-        # Sort by delta closeness to target (using absolute values for comparison)
-        options.sort(key=lambda o: abs(abs(o['delta']) - abs(target_delta)))
+        # Apply configurable delta filter before sorting
+        # Use tolerance from config (default 0.03 = ±3 percentage points)
+        min_delta = abs(target_delta) - delta_tolerance
+        max_delta = abs(target_delta) + delta_tolerance
         
-        # Return top 12 closest to target delta (increased for maximum coverage)
-        return options[:12]
+        # Filter options to only those within acceptable delta range
+        filtered_options = [o for o in options if min_delta <= abs(o['delta']) <= max_delta]
+        
+        if not filtered_options:
+            logger.warning(f"[find_strikes_by_delta] No options within delta range {min_delta:.2f}-{max_delta:.2f} (target={target_delta:.2f}, tolerance=±{delta_tolerance:.2f})")
+            continue
+        
+        # Sort by delta closeness to target (using absolute values for comparison)
+        filtered_options.sort(key=lambda o: abs(abs(o['delta']) - abs(target_delta)))
+        
+        # Return top 12 closest to target delta
+        return filtered_options[:12]
     
     return []
 
@@ -440,7 +452,8 @@ def find_roll_options(ib, position, config):
     
     # Option 2-4: Find strikes by delta (will include some higher and lower)
     logger.info(f"[find_roll_options] Finding strikes by delta (target={target_delta})...")
-    delta_options = find_strikes_by_delta(ib, symbol, next_expiry, target_delta, spot, current_strike, right)
+    delta_tolerance = config.get('delta_tolerance', 0.03)
+    delta_options = find_strikes_by_delta(ib, symbol, next_expiry, target_delta, spot, current_strike, right, delta_tolerance=delta_tolerance)
     logger.info(f"[find_roll_options] Found {len(delta_options)} delta options")
     for opt in delta_options:
         # Categorize based on strike position

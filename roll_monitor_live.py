@@ -262,6 +262,7 @@ def main():
     ap.add_argument("--clientId", type=int, default=2)
     ap.add_argument("--target-delta-call", type=float, default=0.10, help="Target delta for covered calls")
     ap.add_argument("--target-delta-put", type=float, default=-0.90, help="Target delta for cash-secured puts")
+    ap.add_argument("--delta-tolerance", type=float, default=0.03, help="Max delta deviation from target (default: 0.03, i.e., ±3 percentage points)")
     ap.add_argument("--dte-threshold", type=int, default=14, help="Alert when DTE <= this")
     ap.add_argument("--interval", type=int, default=60, help="Check interval in seconds when market open (default: 60, auto-extends to 30min when closed)")
     ap.add_argument("--max-rolls", type=int, default=2, help="Max rolls to show per position (0=all, default: 2)")
@@ -274,6 +275,7 @@ def main():
     config = {
         'target_delta_call': args.target_delta_call,
         'target_delta_put': args.target_delta_put,
+        'delta_tolerance': args.delta_tolerance,
         'dte_threshold_for_alert': args.dte_threshold,
         'check_interval_seconds': args.interval,
         'max_rolls_per_position': args.max_rolls,
