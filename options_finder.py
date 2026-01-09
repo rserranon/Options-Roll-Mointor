@@ -229,10 +229,10 @@ def find_strikes_by_delta(ib, symbol, expiry, target_delta, spot, current_strike
                 # Call options
                 if target_delta < 0.15:
                     # For low delta (0.10): focus on OTM strikes WELL ABOVE spot
-                    # 0.10 delta typically lives between spot+5% to spot+15%
-                    # For $390 stock: $410 to $445 range
-                    lower_bound = spot * 1.05  # 5% above spot
-                    upper_bound = spot * 1.15  # 15% above spot
+                    # 0.10 delta typically lives between spot+3% to spot+10%
+                    # Tightened range for better delta targeting
+                    lower_bound = spot * 1.03  # 3% above spot
+                    upper_bound = spot * 1.10  # 10% above spot
                     band = [k for k in strikes if lower_bound <= k <= upper_bound]
                 else:
                     # For higher delta: closer to spot
@@ -241,10 +241,10 @@ def find_strikes_by_delta(ib, symbol, expiry, target_delta, spot, current_strike
                 # Put options
                 if target_delta < -0.85:
                     # For low delta puts (-0.90): focus on OTM strikes WELL BELOW spot
-                    # -0.90 delta typically lives between spot-15% to spot-5%
-                    # For $390 stock: $332 to $371 range
-                    lower_bound = spot * 0.85  # 15% below spot
-                    upper_bound = spot * 0.95  # 5% below spot
+                    # -0.90 delta typically lives between spot-10% to spot-3%
+                    # Tightened range for better delta targeting
+                    lower_bound = spot * 0.90  # 10% below spot
+                    upper_bound = spot * 0.97  # 3% below spot
                     band = [k for k in strikes if lower_bound <= k <= upper_bound]
                 else:
                     # For higher delta puts: closer to spot
@@ -271,7 +271,7 @@ def find_strikes_by_delta(ib, symbol, expiry, target_delta, spot, current_strike
         else:
             # Sequential fetching with early exit
             options = []
-            delta_tolerance = 0.05  # Accept deltas within ±0.05 of target
+            delta_tolerance = 0.03  # Accept deltas within ±0.03 of target (tighter)
             good_options_count = 0
             target_good_options = 8  # Early exit after finding 8 near target
             
