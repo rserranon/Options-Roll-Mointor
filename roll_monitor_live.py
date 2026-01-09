@@ -61,15 +61,7 @@ def process_position(ib, pos, config):
     import signal
     import logging
     
-    # Setup logging
-    logging.basicConfig(
-        level=logging.INFO,  # Changed from DEBUG to reduce noise
-        format='%(asctime)s [%(levelname)s] %(message)s',
-        handlers=[
-            logging.FileHandler('/tmp/roll_monitor_debug.log'),
-            # Removed StreamHandler to prevent screen output
-        ]
-    )
+    # Get logger (configuration done in main())
     logger = logging.getLogger(__name__)
     
     logger.info(f"="*80)
@@ -263,14 +255,29 @@ def main():
     ap.add_argument("--target-delta-call", type=float, default=0.10, help="Target delta for covered calls")
     ap.add_argument("--target-delta-put", type=float, default=-0.90, help="Target delta for cash-secured puts")
     ap.add_argument("--delta-tolerance", type=float, default=0.03, help="Max delta deviation from target (default: 0.03, i.e., ±3 percentage points)")
-    ap.add_argument("--dte-threshold", type=int, default=14, help="Alert when DTE <= this")
-    ap.add_argument("--interval", type=int, default=60, help="Check interval in seconds when market open (default: 60, auto-extends to 30min when closed)")
+    ap.add_argument("--dte-threshold", type=int, default=45, help="Alert when DTE <= this (default: 45 for weekly rolling)")
+    ap.add_argument("--interval", type=int, default=240, help="Check interval in seconds when market open (default: 240 = 4 minutes, auto-extends to 30min when closed)")
     ap.add_argument("--max-rolls", type=int, default=2, help="Max rolls to show per position (0=all, default: 2)")
     ap.add_argument("--once", action="store_true", help="Run only once")
     ap.add_argument("--skip-market-check", action="store_true", help="Skip market hours check")
-    ap.add_argument("--verbose", "-v", action="store_true", help="Verbose output for debugging")
-    ap.add_argument("--realtime", action="store_true", help="Use real-time market data (requires subscription)")
+    ap.add_argument("--verbose", "-v", action="store_true", help="Enable additional workflow logging")
+    ap.add_argument("--log-level", choices=['ERROR', 'WARNING', 'INFO', 'DEBUG'], default='INFO',
+                    help="Logging level (default: INFO)")
+    ap.add_argument("--realtime", action="store_true", default=False, help="Use real-time market data (requires subscription, default: delayed)")
     args = ap.parse_args()
+    
+    # Setup logging once at startup
+    import logging
+    log_level = getattr(logging, args.log_level)
+    logging.basicConfig(
+        level=log_level,
+        format='%(asctime)s [%(levelname)s] %(message)s',
+        handlers=[
+            logging.FileHandler('/tmp/roll_monitor_debug.log'),
+        ]
+    )
+    # Suppress verbose ib_insync logging
+    logging.getLogger('ib_insync').setLevel(logging.WARNING)
     
     config = {
         'target_delta_call': args.target_delta_call,
