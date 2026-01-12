@@ -229,11 +229,21 @@ def find_strikes_by_delta(ib, symbol, expiry, target_delta, spot, current_strike
             if right == 'C':
                 # Call options
                 if target_delta < 0.15:
-                    # For low delta (0.10): focus on OTM strikes WELL ABOVE spot
-                    # 0.10 delta typically lives between spot+3% to spot+10%
-                    # Tightened range for better delta targeting
+                    # For low delta (0.10): adaptive band based on current position
+                    # Start from 3% above spot (where fresh positions would be)
                     lower_bound = spot * 1.03  # 3% above spot
-                    upper_bound = spot * 1.10  # 10% above spot
+                    
+                    # If current strike is deep OTM, expand upper bound to cover it
+                    # This handles cases where stock has moved significantly
+                    if current_strike and current_strike > spot * 1.10:
+                        # Deep OTM: extend search to 110% of current strike
+                        upper_bound = current_strike * 1.10
+                        logger.info(f"[find_strikes_by_delta] Deep OTM position detected: current=${current_strike:.2f}, spot=${spot:.2f}")
+                        logger.info(f"[find_strikes_by_delta] Expanding band to ${lower_bound:.2f}-${upper_bound:.2f}")
+                    else:
+                        # Normal case: 10% above spot
+                        upper_bound = spot * 1.10
+                    
                     band = [k for k in strikes if lower_bound <= k <= upper_bound]
                 else:
                     # For higher delta: closer to spot
@@ -241,11 +251,20 @@ def find_strikes_by_delta(ib, symbol, expiry, target_delta, spot, current_strike
             else:
                 # Put options
                 if target_delta < -0.85:
-                    # For low delta puts (-0.90): focus on OTM strikes WELL BELOW spot
-                    # -0.90 delta typically lives between spot-10% to spot-3%
-                    # Tightened range for better delta targeting
-                    lower_bound = spot * 0.90  # 10% below spot
+                    # For low delta puts (-0.90): adaptive band based on current position
+                    # Start from 3% below spot (where fresh positions would be)
                     upper_bound = spot * 0.97  # 3% below spot
+                    
+                    # If current strike is deep OTM, expand lower bound to cover it
+                    if current_strike and current_strike < spot * 0.90:
+                        # Deep OTM: extend search to 90% of current strike
+                        lower_bound = current_strike * 0.90
+                        logger.info(f"[find_strikes_by_delta] Deep OTM position detected: current=${current_strike:.2f}, spot=${spot:.2f}")
+                        logger.info(f"[find_strikes_by_delta] Expanding band to ${lower_bound:.2f}-${upper_bound:.2f}")
+                    else:
+                        # Normal case: 10% below spot
+                        lower_bound = spot * 0.90
+                    
                     band = [k for k in strikes if lower_bound <= k <= upper_bound]
                 else:
                     # For higher delta puts: closer to spot
